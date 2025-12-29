@@ -96,12 +96,14 @@ The system follows a modular, pipeline-based architecture where specialized agen
 │  │ Stop-Loss   │  │ Probabilities   │  │ Alerts       │       │
 │  └─────────────┘  └─────────────────┘  └──────────────┘       │
 │                                                                   │
-│                  ┌─────────────────┐                            │
-│                  │   Validator     │                            │
-│                  │                 │                            │
-│                  │  QA & Logic     │                            │
-│                  │  Consistency    │                            │
-│                  └─────────────────┘                            │
+│  ┌─────────────┐  ┌─────────────────┐                          │
+│  │ Correlation │  │   Validator     │                          │
+│  │   & Regime  │  │                 │                          │
+│  │  Analyzer   │  │  QA & Logic     │                          │
+│  │             │  │  Consistency    │                          │
+│  │ Cross-Asset │  │                 │                          │
+│  │ Correlations│  │                 │                          │
+│  └─────────────┘  └─────────────────┘                          │
 │                                                                   │
 └───────────────────────────────────────────────────────────────────┘
 ```
@@ -534,6 +536,60 @@ python -m agents.validator_agent BTC-USD
 
 ---
 
+### 11. Correlation & Market Regime Analyzer (`agents/correlation_market_regime_agent.py`)
+
+**Purpose**: Analyze rolling correlations and detect market regime changes.
+
+**Model**: `openai/gpt-4o-mini` via OpenRouter
+
+**Input Dependencies**:
+- `CryptoDependencies`
+
+**Output Type**: `CorrelationMarketRegimeAnalysis`
+
+**Tools**:
+- `load_master_state()`: Loads aggregated market data
+- `load_final_directive()`: Retrieves current directive
+- `fetch_correlation_data()`: Fetches historical price data for BTC, ETH, SPX, DXY, Gold
+- `calculate_rolling_correlations()`: Calculates correlation coefficients with rolling windows
+- `detect_regime_change()`: Classifies market regime based on correlation patterns
+
+**Responsibilities**:
+- Calculate rolling correlations between BTC and major assets (ETH, SPX, DXY, Gold)
+- Detect current market regime (risk_on/risk_off/transitional/decoupled)
+- Identify correlation breakdowns and flight-to-quality events
+- Monitor cross-asset contagion risks
+- Detect crypto decoupling events from traditional markets
+- Provide actionable insights for strategy adjustments
+
+**Output Artifact**: `data/correlation_regime_analysis.json`
+
+**Output Model**:
+```python
+class CorrelationMarketRegimeAnalysis(BaseModel):
+    correlations: List[AssetCorrelation]
+    current_regime: MarketRegime
+    correlation_breakdowns: List[CorrelationBreakdown]
+    contagion_risk: ContagionRisk
+    key_insights: List[str]
+    regime_outlook: str
+    timestamp_utc: datetime
+```
+
+**Key Features**:
+- **Rolling Correlation Analysis**: 30-day and 90-day rolling correlation windows
+- **Regime Detection**: Statistical classification of market regimes based on correlation patterns
+- **Breakdown Detection**: Identifies significant correlation shifts (flight-to-quality, decoupling)
+- **Contagion Assessment**: Evaluates cross-asset contagion risk and transmission paths
+- **Actionable Insights**: Provides specific trading implications for detected patterns
+
+**Example Usage**:
+```bash
+python -m agents.correlation_market_regime_agent BTC-USD 90
+```
+
+---
+
 ## Agent Factory & Configuration
 
 ### Factory Pattern (`config/agent_factory.py`)
@@ -581,6 +637,7 @@ quant_agent = create_agent(
 | **Scenario Planner** | `gpt-4o` | Complex scenario modeling requires advanced reasoning |
 | **Anomaly Detection** | `gpt-4o-mini` | Pattern detection and statistical analysis |
 | **Validator** | `gpt-4o` | Complex validation logic and consistency checking |
+| **Correlation & Regime Analyzer** | `gpt-4o-mini` | Efficient correlation calculations and regime detection |
 
 **Cost Optimization**: Only the Lead Analyst, Scenario Planner, and Validator use the premium `gpt-4o` model where complex reasoning quality is critical.
 
@@ -1350,6 +1407,7 @@ class AlternativeDataMetrics(BaseModel):
 - ✅ **Scenario Planner Agent** - What-if scenario modeling
 - ✅ **Anomaly Detection Agent** - Unusual pattern detection
 - ✅ **Validator Agent** - Quality assurance and consistency checking
+- ✅ **Correlation & Market Regime Analyzer** - Cross-asset correlation and regime detection
 
 **In Progress** 🚧:
 - Documentation improvements (this file)
