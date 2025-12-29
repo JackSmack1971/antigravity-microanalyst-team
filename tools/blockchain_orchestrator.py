@@ -19,6 +19,14 @@ from tools.blockchain_adapters import (
     RateLimitError,
 )
 
+from tools.alternative_data_adapters import (
+    CryptoPanicAdapter,
+    RedditSentimentAdapter,
+    GoogleTrendsAdapter,
+    GitHubActivityAdapter,
+    DeribitOptionsAdapter,
+)
+
 
 class QueryComplexity(Enum):
     """Query complexity levels for intelligent routing."""
@@ -28,11 +36,17 @@ class QueryComplexity(Enum):
 
 
 class DataSourceType(str, Enum):
-    """Available blockchain data sources."""
+    """Available blockchain and alternative data sources."""
     DEFILLAMA = "defillama"
     DUNE = "dune"
     COINGECKO = "coingecko"
     ETHERSCAN = "etherscan"
+    # Alternative data sources
+    CRYPTOPANIC = "cryptopanic"
+    REDDIT = "reddit"
+    GOOGLE_TRENDS = "google_trends"
+    GITHUB = "github"
+    DERIBIT = "deribit"
 
 
 class BlockchainQueryRequest:
@@ -112,6 +126,8 @@ class MultiSourceOrchestrator:
         dune_api_key: Optional[str] = None,
         etherscan_api_keys: Optional[Dict[str, str]] = None,
         cache_dir: str = "data/cache",
+        cryptopanic_api_token: Optional[str] = None,
+        github_api_token: Optional[str] = None,
     ):
         """Initialize orchestrator with data source adapters.
 
@@ -119,6 +135,8 @@ class MultiSourceOrchestrator:
             dune_api_key: Optional Dune Analytics API key.
             etherscan_api_keys: Optional dict of Etherscan API keys by chain.
             cache_dir: Directory for caching data.
+            cryptopanic_api_token: Optional CryptoPanic API token.
+            github_api_token: Optional GitHub API token.
         """
         self.cache = BlockchainDataCache(cache_dir)
 
@@ -128,6 +146,12 @@ class MultiSourceOrchestrator:
             DataSourceType.DUNE: DuneAnalyticsAdapter(dune_api_key, self.cache),
             DataSourceType.COINGECKO: CoinGeckoAdapter(self.cache),
             DataSourceType.ETHERSCAN: EtherscanAdapter(etherscan_api_keys, self.cache),
+            # Alternative data adapters
+            DataSourceType.CRYPTOPANIC: CryptoPanicAdapter(self.cache, cryptopanic_api_token),
+            DataSourceType.REDDIT: RedditSentimentAdapter(self.cache),
+            DataSourceType.GOOGLE_TRENDS: GoogleTrendsAdapter(self.cache),
+            DataSourceType.GITHUB: GitHubActivityAdapter(self.cache, github_api_token),
+            DataSourceType.DERIBIT: DeribitOptionsAdapter(self.cache),
         }
 
         # Query routing statistics for adaptive learning
@@ -150,6 +174,16 @@ class MultiSourceOrchestrator:
             'transaction_history': DataSourceType.ETHERSCAN,
             'token_balance': DataSourceType.ETHERSCAN,
             'contract_data': DataSourceType.ETHERSCAN,
+            # Alternative data source mappings
+            'news_sentiment': DataSourceType.CRYPTOPANIC,
+            'reddit_sentiment': DataSourceType.REDDIT,
+            'social_sentiment': DataSourceType.REDDIT,
+            'google_trends': DataSourceType.GOOGLE_TRENDS,
+            'search_interest': DataSourceType.GOOGLE_TRENDS,
+            'github_activity': DataSourceType.GITHUB,
+            'development_activity': DataSourceType.GITHUB,
+            'options_data': DataSourceType.DERIBIT,
+            'options_metrics': DataSourceType.DERIBIT,
         }
 
         # Fallback chain definitions
@@ -350,6 +384,17 @@ class MultiSourceOrchestrator:
                 return await self._execute_coingecko(adapter, request)
             elif source == DataSourceType.ETHERSCAN:
                 return await self._execute_etherscan(adapter, request)
+            # Alternative data sources
+            elif source == DataSourceType.CRYPTOPANIC:
+                return await self._execute_cryptopanic(adapter, request)
+            elif source == DataSourceType.REDDIT:
+                return await self._execute_reddit(adapter, request)
+            elif source == DataSourceType.GOOGLE_TRENDS:
+                return await self._execute_google_trends(adapter, request)
+            elif source == DataSourceType.GITHUB:
+                return await self._execute_github(adapter, request)
+            elif source == DataSourceType.DERIBIT:
+                return await self._execute_deribit(adapter, request)
             else:
                 return {"error": f"Unknown source: {source}"}
 
@@ -473,6 +518,98 @@ class MultiSourceOrchestrator:
             return await adapter.get_transactions(chain, address, limit)
 
         return {"error": f"Unsupported query type for Etherscan: {query_type}"}
+
+    async def _execute_cryptopanic(
+        self, adapter: CryptoPanicAdapter, request: BlockchainQueryRequest
+    ) -> Dict[str, Any]:
+        """Execute query on CryptoPanic.
+
+        Args:
+            adapter: CryptoPanic adapter instance.
+            request: Query request.
+
+        Returns:
+            Dict containing news sentiment data.
+        """
+        params = request.parameters
+        currencies = params.get('currencies', ['BTC', 'ETH'])
+        kind = params.get('kind', 'news')
+
+        return await adapter.get_news_sentiment(currencies, kind)
+
+    async def _execute_reddit(
+        self, adapter: RedditSentimentAdapter, request: BlockchainQueryRequest
+    ) -> Dict[str, Any]:
+        """Execute query on Reddit.
+
+        Args:
+            adapter: Reddit adapter instance.
+            request: Query request.
+
+        Returns:
+            Dict containing Reddit sentiment data.
+        """
+        params = request.parameters
+        subreddit = params.get('subreddit', 'cryptocurrency')
+        limit = params.get('limit', 100)
+
+        return await adapter.get_subreddit_sentiment(subreddit, limit)
+
+    async def _execute_google_trends(
+        self, adapter: GoogleTrendsAdapter, request: BlockchainQueryRequest
+    ) -> Dict[str, Any]:
+        """Execute query on Google Trends.
+
+        Args:
+            adapter: Google Trends adapter instance.
+            request: Query request.
+
+        Returns:
+            Dict containing search interest data.
+        """
+        params = request.parameters
+        keywords = params.get('keywords', ['Bitcoin', 'Ethereum'])
+        timeframe = params.get('timeframe', 'now 7-d')
+
+        return await adapter.get_search_interest(keywords, timeframe)
+
+    async def _execute_github(
+        self, adapter: GitHubActivityAdapter, request: BlockchainQueryRequest
+    ) -> Dict[str, Any]:
+        """Execute query on GitHub.
+
+        Args:
+            adapter: GitHub adapter instance.
+            request: Query request.
+
+        Returns:
+            Dict containing repository activity data.
+        """
+        params = request.parameters
+        owner = params.get('owner')
+        repo = params.get('repo')
+
+        if not owner or not repo:
+            return {"error": "GitHub query requires 'owner' and 'repo' parameters"}
+
+        return await adapter.get_repository_activity(owner, repo)
+
+    async def _execute_deribit(
+        self, adapter: DeribitOptionsAdapter, request: BlockchainQueryRequest
+    ) -> Dict[str, Any]:
+        """Execute query on Deribit.
+
+        Args:
+            adapter: Deribit adapter instance.
+            request: Query request.
+
+        Returns:
+            Dict containing options market data.
+        """
+        params = request.parameters
+        currency = params.get('currency', 'BTC')
+
+        return await adapter.get_options_summary(currency)
 
     async def _execute_fallback(
         self, request: BlockchainQueryRequest, failed_sources: List[DataSourceType]

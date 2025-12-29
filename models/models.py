@@ -44,10 +44,50 @@ class OnChainMetrics(BaseModel):
     active_addresses_trend: str
     whale_accumulation: str
 
+class NewsSentimentData(BaseModel):
+    """News sentiment from CryptoPanic and other sources."""
+    sentiment_score: float = Field(..., description="Overall sentiment score (-100 to +100)")
+    positive_pct: float = Field(..., description="Percentage of positive news")
+    negative_pct: float = Field(..., description="Percentage of negative news")
+    total_posts: int = Field(..., description="Number of news articles analyzed")
+
+class SocialMediaData(BaseModel):
+    """Social media sentiment from Reddit and other platforms."""
+    reddit_sentiment: float = Field(..., description="Reddit sentiment score (0-100)")
+    engagement_score: float = Field(..., description="Social engagement level")
+    total_posts: int = Field(..., description="Number of posts analyzed")
+
+class GoogleTrendsData(BaseModel):
+    """Google Trends search interest data."""
+    current_interest: int = Field(..., description="Current search interest (0-100)")
+    momentum_pct: float = Field(..., description="Momentum percentage change")
+    direction: str = Field(..., description="Trend direction")
+
+class GitHubActivityData(BaseModel):
+    """GitHub development activity metrics."""
+    activity_score: float = Field(..., description="Development activity score (0-100)")
+    trend: str = Field(..., description="Activity trend (accelerating/growing/stable/slowing/declining)")
+    recent_commits: int = Field(..., description="Recent commit count")
+
+class OptionsMarketData(BaseModel):
+    """Options market metrics from Deribit."""
+    put_call_ratio: float = Field(..., description="Put/Call ratio by volume")
+    avg_implied_volatility: float = Field(..., description="Average IV percentage")
+    market_sentiment: str = Field(..., description="Options-based sentiment (bullish/neutral/bearish)")
+
+class AlternativeDataMetrics(BaseModel):
+    """Alternative data sources aggregation."""
+    news_sentiment: Optional[NewsSentimentData] = None
+    social_media: Optional[SocialMediaData] = None
+    google_trends: Optional[GoogleTrendsData] = None
+    github_activity: Optional[GitHubActivityData] = None
+    options_market: Optional[OptionsMarketData] = None
+
 class SentimentMetrics(BaseModel):
     fear_greed_index: int
     social_volume: str
     sentiment_signal: str
+    alternative_data: Optional[AlternativeDataMetrics] = None
 
 class FundamentalData(BaseModel):
     module_2_macro: MacroMetrics
