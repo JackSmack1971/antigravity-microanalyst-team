@@ -15,6 +15,7 @@ from agents.scenario_planner_agent import run_scenario_planner_agent
 from agents.anomaly_detection_agent import run_anomaly_detection_agent
 from agents.validator_agent import run_validator_agent
 from agents.correlation_market_regime_agent import run_correlation_regime_agent
+from agents.black_swan_detector_agent import run_black_swan_detector
 
 __all__ = [
     "run_quant_agent",
@@ -28,4 +29,5 @@ __all__ = [
     "run_anomaly_detection_agent",
     "run_validator_agent",
     "run_correlation_regime_agent",
+    "run_black_swan_detector",
 ]

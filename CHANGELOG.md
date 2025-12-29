@@ -7,6 +7,54 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0] - 2025-12-29
+
+### Added
+- **Black Swan Event Detector Agent** (Feature 8.2 from brainstorm)
+  - Automated detection of extreme market events and tail risks
+  - Real-time monitoring for price crashes, volume spikes, and volatility explosions
+  - Multi-criteria detection system:
+    - Extreme price movements (>10% in 1 hour)
+    - Volume spikes (>5x average)
+    - Volatility explosions (VIX-equivalent >50)
+    - Market structure breakdown detection
+    - Integration with Anomaly Detection Agent for enhanced alerts
+  - Emergency response system with automatic recommendations:
+    - Alert levels (low/medium/high/critical)
+    - Defensive stance overrides
+    - Position reduction suggestions (0-100%)
+    - Stop-loss tightening recommendations
+    - Leverage reduction guidelines
+  - Comprehensive market stability metrics:
+    - Price stability scoring (0-100)
+    - Volume stability assessment
+    - Liquidity health monitoring (healthy/stressed/crisis)
+    - Market stress index calculation
+  - New agent file: `agents/black_swan_detector_agent.py`
+  - New Pydantic models in `models/models.py`:
+    - `BlackSwanEvent`: Individual event detection with severity scoring
+    - `EmergencyResponse`: Actionable crisis response recommendations
+    - `MarketStabilityMetrics`: Multi-dimensional stability assessment
+    - `BlackSwanEventReport`: Complete black swan analysis output
+  - Agent tools:
+    - `load_master_state()`: Access current market conditions
+    - `fetch_recent_price_data()`: Historical price analysis
+    - `calculate_market_stress_metrics()`: Stress index computation
+    - `check_anomaly_report()`: Integration with anomaly detector
+  - Automated report generation with timestamped artifacts
+  - Capital preservation focused with conservative detection thresholds
+
+### Changed
+- Updated `agents/__init__.py` to export `run_black_swan_detector`
+- Enhanced risk management capabilities across the agent ecosystem
+
+### Benefits
+- Rapid response to extreme market events (black swan detection)
+- Automated tail risk protection for trading positions
+- Systematic crisis management with objective severity scoring
+- Maintains system credibility during market turbulence
+- Reduces emotional decision-making during volatile periods
+
 ## [0.4.0] - 2025-12-29
 
 ### Added

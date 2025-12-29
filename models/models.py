@@ -225,3 +225,45 @@ class CorrelationMarketRegimeAnalysis(BaseModel):
     key_insights: List[str] = Field(..., description="Key actionable insights from the analysis")
     regime_outlook: str = Field(..., description="Outlook for regime continuation or change")
     timestamp_utc: datetime
+
+# Black Swan Event Detector Models
+class BlackSwanEvent(BaseModel):
+    """Individual black swan event detection."""
+    event_type: str = Field(..., description="Type of event (extreme_price_move/volume_spike/volatility_spike/exchange_outage/regulatory_announcement/protocol_hack)")
+    severity: int = Field(..., ge=0, le=100, description="Severity score (0=minor, 100=catastrophic)")
+    description: str = Field(..., description="Detailed description of the black swan event")
+    detected_at: datetime = Field(..., description="When the event was detected")
+    trigger_metrics: dict = Field(..., description="Metrics that triggered the detection (e.g., price_change_pct, volume_ratio)")
+    impact_assessment: str = Field(..., description="Assessment of potential market impact")
+    confidence: float = Field(..., ge=0, le=1, description="Confidence in the detection (0-1)")
+
+class EmergencyResponse(BaseModel):
+    """Emergency response recommendations for black swan events."""
+    alert_level: str = Field(..., description="Alert level (low/medium/high/critical)")
+    recommended_stance: str = Field(..., description="Recommended trading stance override (Defensive_Long/Neutral/Exit)")
+    position_reduction_pct: float = Field(..., ge=0, le=100, description="Recommended position reduction percentage")
+    stop_loss_tightening: bool = Field(..., description="Whether to tighten stop-loss levels")
+    leverage_reduction: str = Field(..., description="Recommended leverage reduction (e.g., 'reduce to 1x', 'close leveraged positions')")
+    immediate_actions: List[str] = Field(..., description="List of immediate actions to take")
+    monitoring_priorities: List[str] = Field(..., description="Key metrics to monitor closely")
+
+class MarketStabilityMetrics(BaseModel):
+    """Market stability and volatility metrics."""
+    current_volatility: float = Field(..., description="Current volatility level (percentage)")
+    volatility_percentile: float = Field(..., ge=0, le=100, description="Volatility percentile (0-100)")
+    price_stability_score: int = Field(..., ge=0, le=100, description="Price stability score (0=chaotic, 100=stable)")
+    volume_stability_score: int = Field(..., ge=0, le=100, description="Volume stability score")
+    liquidity_health: str = Field(..., description="Liquidity health status (healthy/stressed/crisis)")
+    market_stress_index: int = Field(..., ge=0, le=100, description="Overall market stress index")
+
+class BlackSwanEventReport(BaseModel):
+    """Black Swan Event Detector output."""
+    black_swan_detected: bool = Field(..., description="Whether any black swan events were detected")
+    events: List[BlackSwanEvent] = Field(..., description="List of detected black swan events")
+    overall_risk_level: str = Field(..., description="Overall risk level (normal/elevated/high/extreme)")
+    severity_score: int = Field(..., ge=0, le=100, description="Overall severity score across all events")
+    emergency_response: EmergencyResponse = Field(..., description="Emergency response recommendations")
+    stability_metrics: MarketStabilityMetrics = Field(..., description="Market stability and volatility metrics")
+    uncertainty_flags: List[str] = Field(..., description="Uncertainty flags for reports")
+    summary: str = Field(..., description="Executive summary of black swan risk assessment")
+    timestamp_utc: datetime
