@@ -8,5 +8,13 @@ seaborn
 aiohttp>=3.9.0
 tenacity>=8.2.0
 
+# Alternative data sources
+praw>=7.7.0              # Reddit API (free)
+pytrends>=4.9.0          # Google Trends (free)
+beautifulsoup4>=4.12.0   # Web scraping for news/GitHub
+lxml>=4.9.0              # HTML parser
+requests>=2.31.0         # HTTP requests
+textblob>=0.17.0         # Sentiment analysis
+
 # Optional: Redis for advanced caching (file-based caching works without this)
 # redis>=5.0.0

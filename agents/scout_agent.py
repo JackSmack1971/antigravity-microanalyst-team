@@ -27,7 +27,7 @@ _orchestrator: Optional[MultiSourceOrchestrator] = None
 
 
 def get_orchestrator() -> MultiSourceOrchestrator:
-    """Get or create blockchain data orchestrator.
+    """Get or create blockchain data orchestrator with all data sources.
 
     Returns:
         MultiSourceOrchestrator: Orchestrator instance.
@@ -38,7 +38,9 @@ def get_orchestrator() -> MultiSourceOrchestrator:
             dune_api_key=os.getenv("DUNE_API_KEY"),
             etherscan_api_keys={
                 'ethereum': os.getenv("ETHERSCAN_API_KEY"),
-            }
+            },
+            cryptopanic_api_token=os.getenv("CRYPTOPANIC_API_TOKEN"),
+            github_api_token=os.getenv("GITHUB_API_TOKEN")
         )
     return _orchestrator
 
@@ -49,13 +51,19 @@ scout_agent = create_agent(
     system_prompt=(
         "You are a Scout Agent responsible for gathering fundamental market data. "
         "You analyze macro indicators (SPX, DXY) and provide real on-chain insights "
-        "using multiple free blockchain data sources.\n\n"
+        "using multiple free blockchain and alternative data sources.\n\n"
         "You have access to:\n"
         "- DeFiLlama for TVL and protocol metrics\n"
         "- CoinGecko for token prices and market data\n"
-        "- Blockchain explorers for on-chain activity\n\n"
+        "- Blockchain explorers for on-chain activity\n"
+        "- CryptoPanic for news sentiment analysis\n"
+        "- Reddit for social media sentiment\n"
+        "- Google Trends for search interest correlation\n"
+        "- GitHub for development activity metrics\n"
+        "- Deribit for options market data (P/C ratios, IV)\n\n"
         "Use these tools to gather REAL data instead of simulating it. "
-        "Provide specific numbers and cite your sources."
+        "Provide specific numbers and cite your sources. "
+        "Alternative data sources can provide early signals before price action."
     ),
     deps_type=CryptoDependencies,
     result_type=FundamentalData
@@ -254,6 +262,261 @@ async def fetch_chain_ecosystem_health(
 
     except Exception as e:
         return {"error": f"Failed to fetch chain health: {str(e)}"}
+
+
+# ============================================
+# Alternative Data Source Tools
+# ============================================
+
+@scout_agent.tool
+async def fetch_news_sentiment(
+    ctx: RunContext[CryptoDependencies],
+    currencies: List[str] = ['BTC', 'ETH']
+) -> Dict[str, Any]:
+    """Fetch cryptocurrency news sentiment from CryptoPanic.
+
+    Provides aggregated news sentiment with positive/negative/neutral breakdown.
+    News sentiment can provide early signals before price action.
+
+    Args:
+        ctx: PydanticAI context.
+        currencies: List of currency codes (default: ['BTC', 'ETH']).
+
+    Returns:
+        dict: News sentiment analysis with sentiment score and distribution.
+
+    Example:
+        fetch_news_sentiment(ctx, ['BTC', 'ETH'])
+    """
+    orchestrator = get_orchestrator()
+
+    try:
+        request = BlockchainQueryRequest(
+            query_type='news_sentiment',
+            parameters={'currencies': currencies, 'kind': 'news'}
+        )
+
+        result = await orchestrator.execute_query(request)
+
+        if 'error' in result.data:
+            return {"error": result.data.get('error', 'Unknown error')}
+
+        sentiment_summary = result.data.get('sentiment_summary', {})
+
+        return {
+            'currencies': currencies,
+            'sentiment_score': sentiment_summary.get('sentiment_score', 0.0),
+            'positive_pct': sentiment_summary.get('positive_pct', 0.0),
+            'negative_pct': sentiment_summary.get('negative_pct', 0.0),
+            'total_posts': sentiment_summary.get('total_posts', 0),
+            'source': result.source,
+            'timestamp': datetime.utcnow().isoformat()
+        }
+
+    except Exception as e:
+        return {"error": f"Failed to fetch news sentiment: {str(e)}"}
+
+
+@scout_agent.tool
+async def fetch_social_media_sentiment(
+    ctx: RunContext[CryptoDependencies],
+    subreddit: str = 'cryptocurrency'
+) -> Dict[str, Any]:
+    """Fetch social media sentiment from Reddit cryptocurrency communities.
+
+    Monitors subreddits like r/cryptocurrency, r/bitcoin for community sentiment.
+    Social media can capture market narrative shifts.
+
+    Args:
+        ctx: PydanticAI context.
+        subreddit: Subreddit name without 'r/' (default: 'cryptocurrency').
+
+    Returns:
+        dict: Reddit sentiment analysis with engagement metrics.
+
+    Example:
+        fetch_social_media_sentiment(ctx, 'bitcoin')
+    """
+    orchestrator = get_orchestrator()
+
+    try:
+        request = BlockchainQueryRequest(
+            query_type='reddit_sentiment',
+            parameters={'subreddit': subreddit, 'limit': 100}
+        )
+
+        result = await orchestrator.execute_query(request)
+
+        if 'error' in result.data:
+            return {"error": result.data.get('error', 'Unknown error')}
+
+        sentiment_analysis = result.data.get('sentiment_analysis', {})
+
+        return {
+            'subreddit': subreddit,
+            'sentiment_score': sentiment_analysis.get('sentiment_score', 0.0),
+            'engagement_score': sentiment_analysis.get('engagement_score', 0.0),
+            'posts_analyzed': result.data.get('posts_analyzed', 0),
+            'source': result.source,
+            'timestamp': datetime.utcnow().isoformat()
+        }
+
+    except Exception as e:
+        return {"error": f"Failed to fetch social sentiment: {str(e)}"}
+
+
+@scout_agent.tool
+async def fetch_google_trends(
+    ctx: RunContext[CryptoDependencies],
+    keywords: List[str] = ['Bitcoin', 'Ethereum']
+) -> Dict[str, Any]:
+    """Fetch Google Trends search interest data.
+
+    Correlates search interest with price movements.
+    Rising search interest often precedes price moves.
+
+    Args:
+        ctx: PydanticAI context.
+        keywords: Search keywords (default: ['Bitcoin', 'Ethereum']).
+
+    Returns:
+        dict: Google Trends analysis with momentum and direction.
+
+    Example:
+        fetch_google_trends(ctx, ['Bitcoin', 'Ethereum', 'Crypto'])
+    """
+    orchestrator = get_orchestrator()
+
+    try:
+        request = BlockchainQueryRequest(
+            query_type='google_trends',
+            parameters={'keywords': keywords, 'timeframe': 'now 7-d'}
+        )
+
+        result = await orchestrator.execute_query(request)
+
+        if 'error' in result.data:
+            return {"error": result.data.get('error', 'Unknown error')}
+
+        trend_analysis = result.data.get('trend_analysis', {})
+
+        return {
+            'keywords': keywords,
+            'trend_analysis': trend_analysis,
+            'source': result.source,
+            'timestamp': datetime.utcnow().isoformat()
+        }
+
+    except Exception as e:
+        return {"error": f"Failed to fetch Google Trends: {str(e)}"}
+
+
+@scout_agent.tool
+async def fetch_github_activity(
+    ctx: RunContext[CryptoDependencies],
+    repositories: List[Dict[str, str]] = [
+        {'owner': 'bitcoin', 'repo': 'bitcoin'},
+        {'owner': 'ethereum', 'repo': 'go-ethereum'}
+    ]
+) -> Dict[str, Any]:
+    """Fetch GitHub development activity for crypto projects.
+
+    Monitors commit frequency, contributor activity, and repository health.
+    Strong development activity indicates fundamental project strength.
+
+    Args:
+        ctx: PydanticAI context.
+        repositories: List of repos as dicts with 'owner' and 'repo' keys.
+
+    Returns:
+        dict: GitHub activity metrics for requested repositories.
+
+    Example:
+        fetch_github_activity(ctx, [{'owner': 'bitcoin', 'repo': 'bitcoin'}])
+    """
+    orchestrator = get_orchestrator()
+    results = {}
+
+    try:
+        for repo_info in repositories:
+            request = BlockchainQueryRequest(
+                query_type='github_activity',
+                parameters={
+                    'owner': repo_info['owner'],
+                    'repo': repo_info['repo']
+                }
+            )
+
+            result = await orchestrator.execute_query(request)
+
+            if 'error' not in result.data:
+                repo_key = f"{repo_info['owner']}/{repo_info['repo']}"
+                activity_analysis = result.data.get('activity_analysis', {})
+
+                results[repo_key] = {
+                    'activity_score': activity_analysis.get('activity_score', 0.0),
+                    'trend': activity_analysis.get('trend', 'unknown'),
+                    'recent_commits': activity_analysis.get('recent_commits', 0),
+                    'stars': result.data.get('stars', 0)
+                }
+
+        return {
+            'repositories': results,
+            'timestamp': datetime.utcnow().isoformat()
+        }
+
+    except Exception as e:
+        return {"error": f"Failed to fetch GitHub activity: {str(e)}"}
+
+
+@scout_agent.tool
+async def fetch_options_market_data(
+    ctx: RunContext[CryptoDependencies],
+    currency: str = 'BTC'
+) -> Dict[str, Any]:
+    """Fetch options market data from Deribit.
+
+    Provides put/call ratios, implied volatility, and options flow.
+    Options data reveals sophisticated trader positioning and expectations.
+
+    Args:
+        ctx: PydanticAI context.
+        currency: Currency code (default: 'BTC', can be 'ETH').
+
+    Returns:
+        dict: Options market metrics including P/C ratio and IV.
+
+    Example:
+        fetch_options_market_data(ctx, 'BTC')
+    """
+    orchestrator = get_orchestrator()
+
+    try:
+        request = BlockchainQueryRequest(
+            query_type='options_data',
+            parameters={'currency': currency}
+        )
+
+        result = await orchestrator.execute_query(request)
+
+        if 'error' in result.data:
+            return {"error": result.data.get('error', 'Unknown error')}
+
+        options_analysis = result.data.get('options_analysis', {})
+
+        return {
+            'currency': currency,
+            'put_call_ratio': options_analysis.get('put_call_ratio', 0.0),
+            'avg_implied_volatility': options_analysis.get('avg_implied_volatility', 0.0),
+            'market_sentiment': options_analysis.get('market_sentiment', 'neutral'),
+            'total_volume': options_analysis.get('total_volume', 0.0),
+            'source': result.source,
+            'timestamp': datetime.utcnow().isoformat()
+        }
+
+    except Exception as e:
+        return {"error": f"Failed to fetch options data: {str(e)}"}
+
 
 async def run_scout_agent() -> FundamentalData:
     """Runs the PydanticAI Scout Agent to perform a market scan.

@@ -67,14 +67,34 @@ python -m agents.editor_agent
 
 *(Note: Individual agents can be run for targeted analysis, e.g., `python -m agents.quant_agent BTC-USD`)*
 
-## On-Chain Data Sources
+## Data Sources
 
-The system now includes cost-effective on-chain data access through multiple free APIs:
+### On-Chain Data Sources
+
+The system includes cost-effective on-chain data access through multiple free APIs:
 
 - **DeFiLlama**: TVL and protocol metrics (completely free)
 - **CoinGecko**: Token prices and market data (50 calls/min free)
 - **Dune Analytics**: Complex SQL queries (1000/day free tier)
 - **Etherscan Family**: Transaction data and balances (100K/day free)
+
+See [ONCHAIN_DATA_SOURCES.md](./ONCHAIN_DATA_SOURCES.md) for complete documentation.
+
+### Alternative Data Sources (NEW!)
+
+The system now integrates non-traditional data sources for edge in analysis:
+
+- **News Sentiment** (CryptoPanic): Real-time crypto news with sentiment analysis
+- **Social Media** (Reddit): Community sentiment from r/cryptocurrency, r/bitcoin
+- **Google Trends**: Search interest correlation with price movements
+- **GitHub Activity**: Development activity metrics for fundamental projects
+- **Options Market** (Deribit): Put/call ratios, implied volatility, options flow
+
+**Benefits**:
+- Captures market narrative and sentiment shifts
+- Provides early signals before price action
+- Enriches fundamental analysis layer
+- All sources use free tiers or programmatic access
 
 **Features**:
 - Multi-source orchestration with automatic fallback
@@ -82,12 +102,14 @@ The system now includes cost-effective on-chain data access through multiple fre
 - Rate limit handling with exponential backoff
 - Query complexity assessment for optimal routing
 
-See [ONCHAIN_DATA_SOURCES.md](./ONCHAIN_DATA_SOURCES.md) for complete documentation.
+See [ALTERNATIVE_DATA_SOURCES.md](./ALTERNATIVE_DATA_SOURCES.md) for complete documentation.
 
 ## Documentation
 
 - **Agents**: Detailed in [AGENTS.md](./AGENTS.md)
 - **On-Chain Data**: Detailed in [ONCHAIN_DATA_SOURCES.md](./ONCHAIN_DATA_SOURCES.md)
+- **Alternative Data**: Detailed in [ALTERNATIVE_DATA_SOURCES.md](./ALTERNATIVE_DATA_SOURCES.md)
+- **Feature Roadmap**: See [FEATURE_BRAINSTORM.md](./FEATURE_BRAINSTORM.md)
 - **Inline Docs**: All modules follow Google-style docstrings.
 
 ## License
