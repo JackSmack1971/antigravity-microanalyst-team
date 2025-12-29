@@ -1,763 +1,1199 @@
-# PydanticAI + OpenRouter Implementation Best Practices Checklist
+# Agent Architecture Documentation
 
-## 📋 Phase 1: Project Setup & Dependencies
+## Overview
 
-### ☐ 1.1 Install Core Dependencies
+The Antigravity Microanalyst Team is a multi-agent system built with **PydanticAI** and **OpenRouter** for cryptocurrency market analysis. The architecture employs specialized AI agents that collaborate to gather data, perform analysis, and generate trading directives.
 
+This document provides a comprehensive guide to the agent architecture, implementation patterns, and data flow throughout the system.
+
+## Table of Contents
+
+1. [System Architecture](#system-architecture)
+2. [Core Agents](#core-agents)
+3. [Agent Factory & Configuration](#agent-factory--configuration)
+4. [Dependency Injection System](#dependency-injection-system)
+5. [Data Models](#data-models)
+6. [Multi-Source Orchestration](#multi-source-orchestration)
+7. [Agent Pipeline Flow](#agent-pipeline-flow)
+8. [Tools & Capabilities](#tools--capabilities)
+9. [Production Features](#production-features)
+10. [Extension Guide](#extension-guide)
+
+---
+
+## System Architecture
+
+### High-Level Design
+
+The system follows a modular, pipeline-based architecture where specialized agents perform distinct roles:
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                     DATA COLLECTION PHASE                        │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                   │
+│  ┌──────────────┐    ┌──────────────┐    ┌──────────────┐      │
+│  │ Quant Agent  │    │ Scout Agent  │    │  Blockchain  │      │
+│  │              │    │              │    │    Agent     │      │
+│  │ Technical    │    │ Fundamental  │    │              │      │
+│  │ Analysis     │    │ & Macro      │    │  On-Chain    │      │
+│  │              │    │              │    │  Analysis    │      │
+│  └──────┬───────┘    └──────┬───────┘    └──────┬───────┘      │
+│         │                   │                   │               │
+│         └───────────────────┴───────────────────┘               │
+│                            │                                    │
+└────────────────────────────┼────────────────────────────────────┘
+                             │
+┌────────────────────────────┼────────────────────────────────────┐
+│                     AGGREGATION PHASE                            │
+├────────────────────────────┼────────────────────────────────────┤
+│                            │                                    │
+│                  ┌─────────▼──────────┐                         │
+│                  │  Coordinator Agent │                         │
+│                  │                    │                         │
+│                  │  Data Aggregation  │                         │
+│                  │  Master State Gen  │                         │
+│                  └─────────┬──────────┘                         │
+│                            │                                    │
+└────────────────────────────┼────────────────────────────────────┘
+                             │
+┌────────────────────────────┼────────────────────────────────────┐
+│                     ANALYSIS PHASE                               │
+├────────────────────────────┼────────────────────────────────────┤
+│                            │                                    │
+│                  ┌─────────▼──────────┐                         │
+│                  │ Lead Analyst Agent │                         │
+│                  │                    │                         │
+│                  │  Logic Matrix      │                         │
+│                  │  Strategy Synth    │                         │
+│                  └─────────┬──────────┘                         │
+│                            │                                    │
+└────────────────────────────┼────────────────────────────────────┘
+                             │
+┌────────────────────────────┼────────────────────────────────────┐
+│                     OUTPUT PHASE                                 │
+├────────────────────────────┼────────────────────────────────────┤
+│                            │                                    │
+│                  ┌─────────▼──────────┐                         │
+│                  │   Editor Agent     │                         │
+│                  │                    │                         │
+│                  │  Report Generation │                         │
+│                  │  Human-Readable    │                         │
+│                  └────────────────────┘                         │
+│                                                                   │
+└───────────────────────────────────────────────────────────────────┘
+```
+
+### Architecture Principles
+
+1. **Separation of Concerns**: Each agent has a single, well-defined responsibility
+2. **Type Safety**: Pydantic models ensure data integrity throughout the pipeline
+3. **Dependency Injection**: Clean dependency management via `CryptoDependencies`
+4. **Resilience**: Exponential backoff, retries, and fallback chains for production reliability
+5. **Observability**: Structured outputs persisted as JSON artifacts for auditing
+
+---
+
+## Core Agents
+
+### 1. Quant Agent (`agents/quant_agent.py`)
+
+**Purpose**: Performs technical analysis on cryptocurrency price data.
+
+**Model**: `openai/gpt-4o-mini` via OpenRouter
+
+**Input Dependencies**:
+- `CryptoDependencies` (symbol, http_client)
+
+**Output Type**: `TechnicalData`
+
+**Tools**:
+- `fetch_market_data()`: Fetches OHLCV data from yfinance, calculates EMA-200, RSI-14, volume metrics, and price volatility
+
+**Responsibilities**:
+- Calculate technical indicators (EMA, RSI)
+- Identify market regime (Trending_Up, Trending_Down, Consolidation)
+- Assess market microstructure (funding rate bias, OI trends, squeeze risk)
+- Generate risk profiles (support/resistance zones, invalidation stops)
+
+**Output Artifact**: `data/technical_data.json`
+
+**Example Usage**:
 ```bash
-pip install 'pydantic-ai-slim[openai]'
-```
-
-- Use `pydantic-ai-slim[openai]` for OpenRouter compatibility (OpenRouter uses OpenAI-compatible API)
-- Verify Python version ≥ 3.9
-
-### ☐ 1.2 Environment Configuration
-
-- Create `.env` file for API keys
-- Add `OPENROUTER_API_KEY=sk-or-...` to environment
-- Never hardcode API keys in source code
-- Use `python-dotenv` or similar for loading environment variables
-
-### ☐ 1.3 Project Structure Setup
-
-```
-project/
-├── agents/           # Agent definitions
-├── tools/            # Tool functions
-├── models/           # Pydantic models for structured output
-├── dependencies/     # Dependency injection classes
-├── config/           # Configuration files
-└── tests/            # Test files
+python -m agents.quant_agent BTC-USD
 ```
 
 ---
 
-## 📋 Phase 2: OpenRouter Model Configuration
+### 2. Scout Agent (`agents/scout_agent.py`)
 
-### ☐ 2.1 Initialize OpenRouter Model
+**Purpose**: Gathers fundamental, macro-economic, and alternative data sources.
 
-```python
-from pydantic_ai.models.openai import OpenAIModel
+**Model**: `openai/gpt-4o-mini` via OpenRouter
 
-model = OpenAIModel(
-    "anthropic/claude-3.5-sonnet",  # Or any OpenRouter model
-    base_url="https://openrouter.ai/api/v1",
-    api_key=os.getenv("OPENROUTER_API_KEY"),
-)
-```
+**Input Dependencies**:
+- `CryptoDependencies`
+- Multi-source orchestrator for blockchain data
+- Alternative data adapters
 
-### ☐ 2.2 Implement Model Selection Strategy
+**Output Type**: `FundamentalData`
 
-- Research available models on [OpenRouter](https://openrouter.ai/models)
-- Consider model capabilities vs. cost trade-offs
-- Document why specific models were chosen for each agent
-- Plan fallback models for redundancy
+**Tools**:
+- `fetch_macro_data()`: Retrieves S&P 500 and DXY (US Dollar Index) levels
+- `fetch_defi_tvl_data()`: Gets Total Value Locked for DeFi protocols (DeFiLlama)
+- `fetch_crypto_market_data()`: Fetches token prices and market data (CoinGecko)
+- `fetch_news_sentiment()`: Analyzes news sentiment from CryptoPanic
+- `fetch_social_media_sentiment()`: Monitors Reddit (r/cryptocurrency, r/bitcoin)
+- `fetch_google_trends()`: Tracks search interest correlation
+- `fetch_github_activity()`: Measures development activity
+- `fetch_options_market_data()`: Retrieves Deribit options flow (P/C ratios, IV)
 
-### ☐ 2.3 Configure Model Settings
+**Responsibilities**:
+- Monitor macro regime (Risk_On vs Risk_Off)
+- Track on-chain metrics (exchange flows, active addresses, whale activity)
+- Analyze sentiment signals (Fear & Greed Index, social volume)
+- Integrate alternative data for early signal detection
 
-```python
-from pydantic_ai.settings import ModelSettings
+**Output Artifact**: `data/fundamental_data.json`
 
-model_settings = ModelSettings(
-    temperature=0.7,          # Adjust for creativity vs. consistency
-    max_tokens=4096,          # Set appropriate token limits
-    timeout=30.0,             # Request timeout in seconds
-)
+**Data Sources**:
+- **Free Tier**: DeFiLlama (unlimited), CoinGecko (50 calls/min)
+- **Optional API Keys**: Dune Analytics (1000/day), Etherscan (100K/day), CryptoPanic, GitHub, Deribit
+
+**Example Usage**:
+```bash
+python -m agents.scout_agent BTC
 ```
 
 ---
 
-## 📋 Phase 3: Type-Safe Agent Design
+### 3. Blockchain Agent (`agents/blockchain_agent.py`)
 
-### ☐ 3.1 Define Dependency Types
+**Purpose**: Specialized on-chain analysis using multi-source orchestration.
 
+**Model**: `openai/gpt-4o-mini` via OpenRouter
+
+**Input Dependencies**:
+- `CryptoDependencies`
+- `MultiSourceOrchestrator`
+
+**Output Type**: `BlockchainAnalysisResult`
+
+**Tools**:
+- `get_defi_protocol_metrics()`: Fetch protocol TVL and chain breakdown
+- `get_token_market_data()`: Real-time prices, volume, market cap
+- `get_whale_wallet_activity()`: Track large holder movements
+- `query_blockchain_data()`: Complex on-chain queries via Dune Analytics
+
+**Responsibilities**:
+- Analyze DeFi protocol health via TVL trends
+- Monitor whale accumulation patterns
+- Track exchange inflows/outflows
+- Assess network activity and adoption metrics
+
+**Key Features**:
+- **Multi-source fallback**: Automatically switches between DeFiLlama → CoinGecko → Dune → Etherscan
+- **Intelligent caching**: File-based three-tier cache (hot/warm/cold) reduces API calls
+- **Query complexity routing**: Routes simple queries to fast sources, complex queries to Dune
+
+**Output Artifact**: `data/blockchain_analysis.json`
+
+**Example Usage**:
+```bash
+python -m agents.blockchain_agent
+```
+
+---
+
+### 4. Coordinator Agent (`agents/coordinator_agent.py`)
+
+**Purpose**: Aggregates data from Quant and Scout agents into a unified Master State.
+
+**Model**: `openai/gpt-4o-mini` via OpenRouter
+
+**Input Dependencies**:
+- `CryptoDependencies`
+
+**Output Type**: `MasterState`
+
+**Tools**:
+- `load_technical_data()`: Reads `technical_data.json`
+- `load_fundamental_data()`: Reads `fundamental_data.json`
+
+**Responsibilities**:
+- Merge technical and fundamental data
+- Validate data completeness
+- Generate unified timestamp
+- Prepare data for Lead Analyst consumption
+
+**Output Artifact**: `data/master_state.json`
+
+**Data Model**:
 ```python
-from dataclasses import dataclass
+class MasterState(BaseModel):
+    technical: TechnicalData
+    fundamental: FundamentalData
+    status: str
+    aggregation_timestamp: datetime
+```
 
+---
+
+### 5. Lead Analyst Agent (`agents/analyst_agent.py`)
+
+**Purpose**: Synthesizes Master State into trading directives using a strict Logic Matrix.
+
+**Model**: `openai/gpt-4o` via OpenRouter (uses more capable model for complex reasoning)
+
+**Input Dependencies**:
+- `CryptoDependencies`
+
+**Output Type**: `FinalDirective`
+
+**Tools**:
+- `get_master_state()`: Loads aggregated market data
+
+**Logic Matrix** (Hardcoded Boolean Rules):
+
+1. **Macro Veto**:
+   - IF `macro_regime == 'Risk_Off'` AND `technical.regime == 'Trending_Up'`
+   - THEN `directive = 'Neutral'` (Macro overrides Technicals)
+
+2. **Structure Priority**:
+   - IF `technical.regime == 'Trending_Up'` AND `sentiment_signal == 'Sell'`
+   - THEN IGNORE sentiment (Trend > Contrarian Signal)
+
+3. **Liquidity Filter**:
+   - IF `squeeze_risk == 'High'` OR `funding_rate_bias == 'Extreme'`
+   - THEN reduce exposure (mentioned in thesis_summary)
+
+**Responsibilities**:
+- Apply Logic Matrix to Master State
+- Generate stance (Aggressive_Long | Defensive_Long | Neutral | Tactical_Short)
+- Set leverage cap (1x | 3x | 5x)
+- Assign conviction score (0-100)
+- Provide detailed thesis summary
+
+**Output Artifact**: `data/FINAL_DIRECTIVE_YYYYMMDD.json`
+
+**Output Validation**:
+- Ensures thesis summary is at least 50 characters
+- Uses `@analyst_agent.output_validator` decorator
+- Raises `ModelRetry` if output is insufficient
+
+**Production Resilience**:
+- Exponential backoff with `tenacity`
+- Custom `RateLimitError` handling for 429 responses
+- 3 retry attempts with 2s → 4s → 8s backoff
+
+---
+
+### 6. Editor Agent (`agents/editor_agent.py`)
+
+**Purpose**: Transforms technical directives into polished executive summaries.
+
+**Model**: `openai/gpt-4o-mini` via OpenRouter
+
+**Input Dependencies**:
+- `CryptoDependencies`
+
+**Output Type**: `str` (Markdown-formatted report)
+
+**Tools**:
+- `get_final_directive()`: Loads directive from Lead Analyst
+
+**Responsibilities**:
+- Convert JSON directive to human-readable prose
+- Structure report with executive summary, market assessment, strategy recommendation
+- Maintain professional tone suitable for stakeholders
+- Highlight key risk factors and confidence levels
+
+**Output Artifact**: `reports/EXECUTIVE_SUMMARY_YYYYMMDD.md`
+
+**Report Structure**:
+```markdown
+# Executive Summary - [Date]
+
+## Market Assessment
+[High-level market conditions]
+
+## Strategy Recommendation
+[Actionable directive with rationale]
+
+## Risk Considerations
+[Key risk factors and invalidation levels]
+
+## Confidence Level
+[Overall confidence with caveats]
+```
+
+**Example Usage**:
+```bash
+python -m agents.editor_agent
+```
+
+---
+
+## Agent Factory & Configuration
+
+### Factory Pattern (`config/agent_factory.py`)
+
+The `agent_factory` module provides standardized agent creation with production-grade settings.
+
+**Key Functions**:
+
+1. **`create_openrouter_model(model_name: str)`**
+   - Initializes OpenAI-compatible model for OpenRouter
+   - Loads `OPENROUTER_API_KEY` from environment
+   - Sets base URL to `https://openrouter.ai/api/v1`
+
+2. **`create_agent(model_name, system_prompt, deps_type, result_type)`**
+   - Creates fully configured PydanticAI Agent
+   - Applies standard `ModelSettings`:
+     - `temperature=0.1` (analytical consistency)
+     - `max_tokens=2000`
+     - `timeout=60.0s`
+
+**Example**:
+```python
+from config.agent_factory import create_agent
+from models.models import TechnicalData
+
+quant_agent = create_agent(
+    model_name="openai/gpt-4o-mini",
+    system_prompt="You are a Quantitative Analyst...",
+    deps_type=CryptoDependencies,
+    result_type=TechnicalData
+)
+```
+
+### Model Selection Strategy
+
+| Agent | Model | Rationale |
+|-------|-------|-----------|
+| Quant | `gpt-4o-mini` | Fast, cost-effective for technical calculations |
+| Scout | `gpt-4o-mini` | High throughput for multi-source data gathering |
+| Blockchain | `gpt-4o-mini` | Efficient on-chain data interpretation |
+| Coordinator | `gpt-4o-mini` | Simple aggregation logic |
+| **Lead Analyst** | `gpt-4o` | Complex reasoning for Logic Matrix application |
+| Editor | `gpt-4o-mini` | Straightforward text transformation |
+
+**Cost Optimization**: Only the Lead Analyst uses the premium `gpt-4o` model where reasoning quality is critical.
+
+---
+
+## Dependency Injection System
+
+### CryptoDependencies (`deps/dependencies.py`)
+
+**Purpose**: Type-safe container for shared resources across the agent pipeline.
+
+**Definition**:
+```python
 @dataclass
-class MyDependencies:
-    database: DatabaseConnection
-    api_client: ExternalAPIClient
+class CryptoDependencies:
+    http_client: httpx.AsyncClient
     user_context: dict[str, Any]
+    symbol: str = "BTC-USD"
 ```
 
-- Use dataclasses or Pydantic models for dependencies
-- Make dependencies explicit and typed
-- Inject all external services through deps (no global state)
+**Attributes**:
+- `http_client`: Asynchronous HTTP client for API requests (shared connection pool)
+- `user_context`: Request-specific metadata (e.g., `request_id`, user_id)
+- `symbol`: Cryptocurrency ticker being analyzed (default: "BTC-USD")
 
-### ☐ 3.2 Define Structured Output Models
+**Benefits**:
+1. **No Global State**: All external services injected explicitly
+2. **Type Safety**: IDE autocomplete and static analysis
+3. **Testability**: Easy to mock dependencies in unit tests
+4. **Resource Management**: Single HTTP client shared across tools
 
+**Usage Pattern**:
 ```python
-from pydantic import BaseModel, Field
+async with httpx.AsyncClient() as client:
+    deps = CryptoDependencies(
+        http_client=client,
+        user_context={"request_id": "quant-001"},
+        symbol="BTC-USD"
+    )
 
-class AgentOutput(BaseModel):
-    result: str = Field(..., description="The main result")
-    confidence: float = Field(ge=0.0, le=1.0)
-    metadata: dict[str, Any] = Field(default_factory=dict)
+    result = await agent.run("Analyze BTC", deps=deps)
 ```
 
-- Use Pydantic models for all structured outputs
-- Add field descriptions for better LLM understanding
-- Include validators for complex business logic
-- Keep output models focused and single-purpose
-
-### ☐ 3.3 Create Type-Safe Agent
-
+**Tool Access**:
 ```python
-from pydantic_ai import Agent
-
-agent = Agent[MyDependencies, AgentOutput](
-    model,
-    deps_type=MyDependencies,
-    output_type=AgentOutput,
-    system_prompt="Clear, specific instructions for the agent",
-)
+@agent.tool
+async def my_tool(ctx: RunContext[CryptoDependencies]) -> str:
+    # Access dependencies through context
+    symbol = ctx.deps.symbol
+    response = await ctx.deps.http_client.get(f"https://api.example.com/{symbol}")
+    return response.json()
 ```
-
-- Explicitly declare generic types: `Agent[DepsType, OutputType]`
-- Leverage IDE autocomplete and type checking
-- System prompts should be clear, specific, and testable
 
 ---
 
-## 📋 Phase 4: Tool Implementation
+## Data Models
 
-### ☐ 4.1 Define Tools with Proper Context
+### Type-Safe Schema (`models/models.py`)
+
+All agent inputs and outputs use **Pydantic v2** models for validation and serialization.
+
+#### Technical Data Models
 
 ```python
-from pydantic_ai import RunContext
+class PriceMetrics(BaseModel):
+    current_price: float
+    rsi_4h: float
+    vwap_deviation: float
+    regime: str  # "Trending_Up" | "Trending_Down" | "Consolidation"
 
-@agent.tool
-async def my_tool(
-    ctx: RunContext[MyDependencies],
-    param: str,
-) -> str:
-    """Clear docstring explaining what the tool does."""
-    # Access dependencies through ctx.deps
-    result = await ctx.deps.database.query(param)
-    return result
+class RiskProfile(BaseModel):
+    invalidation_hard_stop: float
+    support_zone: List[float]
+    resistance_zone: List[float]
+
+class MicrostructureMetrics(BaseModel):
+    funding_rate_bias: str  # "Neutral" | "Long_Heavy" | "Short_Heavy" | "Extreme"
+    open_interest_trend: str
+    squeeze_risk: str  # "Low" | "Medium" | "High"
+
+class TechnicalData(BaseModel):
+    module_1_price_structure: PriceStructure
+    module_5_market_microstructure: MicrostructureMetrics
+    timestamp_utc: datetime
 ```
 
-- All tools must have clear docstrings (LLM reads them)
-- Use `RunContext[DepsType]` for dependency access
-- Make tools async when performing I/O operations
-- Keep tool functions focused on single responsibilities
-
-### ☐ 4.2 Implement Tool Error Handling
+#### Fundamental Data Models
 
 ```python
-from pydantic_ai import ModelRetry
+class MacroMetrics(BaseModel):
+    spx_level: float
+    dxy_index: float
+    macro_regime: str  # "Risk_On" | "Risk_Off" | "Neutral"
 
+class OnChainMetrics(BaseModel):
+    exchange_net_flow: str
+    active_addresses_trend: str
+    whale_accumulation: str
+
+class SentimentMetrics(BaseModel):
+    fear_greed_index: int  # 0-100
+    social_volume: str
+    sentiment_signal: str  # "Buy" | "Sell" | "Neutral"
+    alternative_data: Optional[AlternativeDataMetrics] = None
+
+class FundamentalData(BaseModel):
+    module_2_macro: MacroMetrics
+    module_3_onchain: OnChainMetrics
+    module_4_sentiment: SentimentMetrics
+    timestamp_utc: datetime
+```
+
+#### Alternative Data Models
+
+```python
+class NewsSentimentData(BaseModel):
+    sentiment_score: float  # -100 to +100
+    positive_pct: float
+    negative_pct: float
+    total_posts: int
+
+class SocialMediaData(BaseModel):
+    reddit_sentiment: float  # 0-100
+    engagement_score: float
+    total_posts: int
+
+class GoogleTrendsData(BaseModel):
+    current_interest: int  # 0-100
+    momentum_pct: float
+    direction: str  # "rising" | "falling" | "stable"
+
+class GitHubActivityData(BaseModel):
+    activity_score: float  # 0-100
+    trend: str  # "accelerating" | "growing" | "stable" | "slowing" | "declining"
+    recent_commits: int
+
+class OptionsMarketData(BaseModel):
+    put_call_ratio: float
+    avg_implied_volatility: float
+    market_sentiment: str  # "bullish" | "neutral" | "bearish"
+```
+
+#### Directive Models
+
+```python
+class DirectiveContent(BaseModel):
+    stance: str  # "Aggressive_Long" | "Defensive_Long" | "Neutral" | "Tactical_Short"
+    leverage_cap: str  # "1x" | "3x" | "5x"
+    conviction_score: int  # 0-100
+
+class FinalDirective(BaseModel):
+    report_metadata: ReportMetadata
+    final_directive: DirectiveContent
+    thesis_summary: str  # Detailed reasoning (min 50 chars)
+```
+
+### Validation Benefits
+
+- **Runtime Validation**: Pydantic catches schema violations before downstream errors
+- **Serialization**: Automatic JSON conversion with `.model_dump_json()`
+- **Field Constraints**: `ge=0, le=100` for conviction scores, `Field(...)` for required fields
+- **Documentation**: Field descriptions guide LLM output formatting
+
+---
+
+## Multi-Source Orchestration
+
+### BlockchainOrchestrator (`tools/blockchain_orchestrator.py`)
+
+**Purpose**: Intelligent routing and fallback management for blockchain data queries.
+
+**Architecture**:
+```
+Query Request
+     │
+     ▼
+┌─────────────────────┐
+│  Query Complexity   │
+│  Assessment         │
+└──────────┬──────────┘
+           │
+           ▼
+     ┌────┴────┐
+     │ Simple? │
+     └────┬────┘
+          │
+    ┌─────┴─────┐
+    │           │
+   Yes         No
+    │           │
+    ▼           ▼
+┌────────┐  ┌─────────┐
+│DeFiLlama│  │  Dune   │
+│  or     │  │Analytics│
+│CoinGecko│  │         │
+└───┬─────┘  └────┬────┘
+    │             │
+    │ Fail?       │ Fail?
+    ▼             ▼
+┌────────────┐ ┌──────────┐
+│ Fallback   │ │Etherscan │
+│  Chain     │ │ Family   │
+└────────────┘ └──────────┘
+```
+
+**Data Source Capabilities**:
+
+| Source | Free Tier | Best For | Latency |
+|--------|-----------|----------|---------|
+| **DeFiLlama** | Unlimited | TVL, protocol metrics, stablecoin dominance | 200-500ms |
+| **CoinGecko** | 50 calls/min | Token prices, market cap, volume, exchange data | 300-800ms |
+| **Dune Analytics** | 1000/day | Complex SQL queries, custom analytics, historical trends | 2-5s |
+| **Etherscan Family** | 100K/day | Transaction data, wallet balances, smart contract calls | 500-1500ms |
+
+**Orchestrator Features**:
+
+1. **Automatic Fallback Chains**:
+   ```python
+   # Example: Token price lookup
+   Primary: CoinGecko (fast, free)
+       ↓ (on failure)
+   Secondary: DeFiLlama (alternative free source)
+       ↓ (on failure)
+   Tertiary: Dune Analytics (query historical data)
+   ```
+
+2. **Query Complexity Routing**:
+   - **Simple** (TVL, price): → DeFiLlama, CoinGecko
+   - **Medium** (24h flows, holder count): → Etherscan, Dune
+   - **Complex** (multi-table joins, custom metrics): → Dune Analytics
+
+3. **Three-Tier Caching**:
+   ```python
+   Hot Cache (5 min TTL):  Frequently accessed, rapidly changing data
+   Warm Cache (1 hr TTL):  Moderate update frequency (protocol TVL)
+   Cold Cache (24 hr TTL): Stable reference data (token metadata)
+   ```
+
+4. **Rate Limit Handling**:
+   - Exponential backoff: 2s → 4s → 8s → 16s
+   - Automatic provider rotation on 429 errors
+   - Request queuing for burst traffic
+
+**Usage Example**:
+```python
+from tools.blockchain_orchestrator import MultiSourceOrchestrator, get_protocol_tvl
+
+orchestrator = MultiSourceOrchestrator(
+    dune_api_key=os.getenv("DUNE_API_KEY"),
+    etherscan_api_keys={'ethereum': os.getenv("ETHERSCAN_API_KEY")}
+)
+
+# Automatically selects best source and handles fallbacks
+result = await get_protocol_tvl(orchestrator, "aave")
+print(f"Aave TVL: ${result['data']['tvl']:,.0f}")
+print(f"Data source: {result['source']}")  # e.g., "defillama"
+print(f"Confidence: {result['confidence_score']}")  # e.g., 0.95
+```
+
+### Alternative Data Adapters (`tools/alternative_data_adapters.py`)
+
+Provides unified interface for non-traditional data sources:
+
+**Adapters**:
+1. **CryptoPanic News Sentiment**: Aggregates crypto news with sentiment scoring
+2. **Reddit Social Media**: Monitors r/cryptocurrency and r/bitcoin for community conviction
+3. **Google Trends**: Tracks search interest as retail attention proxy
+4. **GitHub Dev Activity**: Measures project development health
+5. **Deribit Options Flow**: Analyzes smart money positioning via P/C ratios
+
+**Key Features**:
+- Standardized return format across all adapters
+- Built-in error handling and retry logic
+- Configurable caching per adapter
+- Optional API keys (most work without)
+
+---
+
+## Agent Pipeline Flow
+
+### Complete Execution Sequence
+
+**Phase 1: Parallel Data Collection** (30-60s)
+```bash
+# Run concurrently
+python -m agents.quant_agent BTC-USD &       # Technical analysis
+python -m agents.scout_agent BTC &            # Fundamental + alternative data
+python -m agents.blockchain_agent &           # On-chain analysis
+wait
+```
+
+**Outputs**:
+- `data/technical_data.json`
+- `data/fundamental_data.json`
+- `data/blockchain_analysis.json` (optional, can be merged into fundamental)
+
+---
+
+**Phase 2: Data Aggregation** (5-10s)
+```bash
+python -m agents.coordinator_agent
+```
+
+**Process**:
+1. Load `technical_data.json` and `fundamental_data.json`
+2. Validate schema completeness
+3. Merge into `MasterState` model
+4. Add aggregation timestamp
+
+**Output**:
+- `data/master_state.json`
+
+---
+
+**Phase 3: Strategic Analysis** (10-20s)
+```bash
+python -m agents.analyst_agent
+```
+
+**Process**:
+1. Load `master_state.json`
+2. Apply Logic Matrix boolean rules
+3. Generate `FinalDirective` with thesis summary
+4. Validate output (min 50 char thesis)
+5. Retry up to 3 times if validation fails
+
+**Output**:
+- `data/FINAL_DIRECTIVE_20251229.json`
+
+---
+
+**Phase 4: Report Generation** (5-10s)
+```bash
+python -m agents.editor_agent
+```
+
+**Process**:
+1. Load `FINAL_DIRECTIVE_*.json`
+2. Transform JSON to markdown prose
+3. Structure with executive summary, assessment, recommendation, risks
+
+**Output**:
+- `reports/EXECUTIVE_SUMMARY_20251229.md`
+
+---
+
+### End-to-End Execution
+
+**Single Command**:
+```bash
+python -m agents.editor_agent
+```
+
+The `editor_agent` module orchestrates the entire pipeline by calling preceding agents in sequence.
+
+**Total Pipeline Duration**: ~50-90 seconds (depending on API latency)
+
+---
+
+## Tools & Capabilities
+
+### Tool Implementation Pattern
+
+All tools follow this structure:
+
+```python
 @agent.tool
-async def risky_tool(ctx: RunContext[MyDependencies]) -> str:
+async def tool_name(
+    ctx: RunContext[CryptoDependencies],
+    param1: str,
+    param2: Optional[int] = None
+) -> Dict[str, Any]:
+    """Clear docstring explaining tool purpose (LLM reads this).
+
+    Args:
+        ctx: PydanticAI context with dependencies.
+        param1: Description of parameter.
+        param2: Optional parameter with default.
+
+    Returns:
+        dict: Description of return structure.
+
+    Raises:
+        ModelRetry: When to retry (temporary errors).
+    """
     try:
-        result = await potentially_failing_operation()
-        return result
+        # Access dependencies
+        client = ctx.deps.http_client
+        symbol = ctx.deps.symbol
+
+        # Perform operation
+        result = await some_async_operation(param1)
+
+        return {"data": result, "status": "success"}
+
     except TemporaryError as e:
-        # Let the LLM retry with context
+        # Let LLM retry with context
         raise ModelRetry(f"Temporary failure: {e}. Please try again.")
+
     except PermanentError as e:
         # Return error as string for LLM to handle
-        return f"Operation failed: {e}"
+        return {"error": str(e), "status": "failed"}
 ```
 
-- Use `ModelRetry` for recoverable errors
-- Return error messages as strings for permanent failures
-- Log errors for debugging
+### Tool Registry by Agent
 
-### ☐ 4.3 Configure Tool Retries
+**Quant Agent**:
+- `fetch_market_data()`: yfinance OHLCV + indicators
 
-```python
-@agent.tool(retries=3)
-async def my_tool(ctx: RunContext[MyDependencies]) -> str:
-    """Tool with automatic retry logic."""
-    pass
-```
+**Scout Agent**:
+- `fetch_macro_data()`: SPX, DXY levels
+- `fetch_defi_tvl_data()`: DeFi protocol TVL (DeFiLlama)
+- `fetch_crypto_market_data()`: Token prices (CoinGecko)
+- `fetch_news_sentiment()`: CryptoPanic news analysis
+- `fetch_social_media_sentiment()`: Reddit community monitoring
+- `fetch_google_trends()`: Search interest tracking
+- `fetch_github_activity()`: Dev activity metrics
+- `fetch_options_market_data()`: Deribit options flow
 
-- Set appropriate retry counts for unreliable operations
-- Balance between reliability and latency
+**Blockchain Agent**:
+- `get_defi_protocol_metrics()`: Protocol TVL, chain breakdown
+- `get_token_market_data()`: Real-time market data
+- `get_whale_wallet_activity()`: Large holder tracking
+- `query_blockchain_data()`: Custom Dune Analytics queries
+
+**Coordinator Agent**:
+- `load_technical_data()`: Read technical JSON artifact
+- `load_fundamental_data()`: Read fundamental JSON artifact
+
+**Lead Analyst Agent**:
+- `get_master_state()`: Load aggregated Master State
+
+**Editor Agent**:
+- `get_final_directive()`: Load directive from Lead Analyst
+
+### Tool Best Practices
+
+1. **Error Handling**:
+   - Use `ModelRetry` for recoverable errors (rate limits, temporary network issues)
+   - Return error dicts for permanent failures
+   - Log errors for debugging
+
+2. **Docstrings**:
+   - LLM reads docstrings to understand tool purpose
+   - Include clear parameter descriptions
+   - Provide usage examples
+
+3. **Type Hints**:
+   - Fully type all parameters and return values
+   - Use `Optional[T]` for nullable fields
+   - Leverage `RunContext[DepsType]` for dependency access
+
+4. **Async/Await**:
+   - Mark I/O-bound tools as `async`
+   - Use `await` for HTTP requests, file I/O
+   - Enables concurrent tool execution
 
 ---
 
-## 📋 Phase 5: Output Validation & Processing
+## Production Features
 
-### ☐ 5.1 Implement Output Validators
+### 1. Output Validation
 
+**Mechanism**: `@agent.output_validator` decorator
+
+**Example** (Lead Analyst):
 ```python
-@agent.output_validator
-async def validate_output(
-    ctx: RunContext[MyDependencies],
-    output: AgentOutput,
-) -> AgentOutput:
-    """Validate and potentially modify output."""
-    if output.confidence < 0.5:
-        raise ModelRetry("Confidence too low, please reconsider.")
+@analyst_agent.output_validator
+async def validate_analyst_output(
+    ctx: RunContext[CryptoDependencies],
+    output: FinalDirective,
+) -> FinalDirective:
+    """Ensure thesis summary is sufficiently detailed."""
+    if len(output.thesis_summary) < 50:
+        raise ModelRetry("Thesis too brief. Provide detailed logic breakdown.")
     return output
 ```
 
-- Add business logic validators for outputs
-- Use validators to ensure quality thresholds
-- Raise `ModelRetry` to request better responses
-
-### ☐ 5.2 Handle Structured vs. Text Output
-
-```python
-# For structured output
-result = await agent.run("prompt", deps=my_deps)
-typed_output: AgentOutput = result.output
-
-# For text output (output_type=str or not specified)
-result = await agent.run("prompt", deps=my_deps)
-text_output: str = result.output
-```
-
-- Access validated output via `result.output`
-- Type is guaranteed by PydanticAI validation
-- Handle validation errors gracefully
+**Benefits**:
+- Enforces quality thresholds
+- Automatically retries if validation fails
+- Prevents low-quality outputs from propagating
 
 ---
 
-## 📋 Phase 6: OpenRouter-Specific Error Handling
+### 2. Retry Logic with Exponential Backoff
 
-### ☐ 6.1 Implement Retry Logic with Exponential Backoff
-
+**Implementation** (using `tenacity`):
 ```python
-import asyncio
-from tenacity import (
-    retry,
-    stop_after_attempt,
-    wait_exponential,
-    retry_if_exception_type,
-)
-
-class RateLimitError(Exception):
-    pass
+from tenacity import retry, stop_after_attempt, wait_exponential
 
 @retry(
     stop=stop_after_attempt(3),
     wait=wait_exponential(multiplier=1, min=2, max=10),
     retry=retry_if_exception_type(RateLimitError),
 )
-async def run_agent_with_retry(prompt: str, deps: MyDependencies):
+async def run_analyst_with_retry(deps: CryptoDependencies):
     try:
-        result = await agent.run(prompt, deps=deps)
+        result = await analyst_agent.run("Analyze...", deps=deps)
         return result
     except Exception as e:
-        if "429" in str(e):  # Rate limit error
+        if "429" in str(e):
             raise RateLimitError(str(e))
         raise
 ```
 
-### ☐ 6.2 Handle OpenRouter Error Codes
-
-- **400**: Bad Request - Validate inputs before sending
-- **401**: Invalid credentials - Check API key configuration
-- **402**: Insufficient credits - Monitor credit balance
-- **403**: Moderation flagged - Review content policies
-- **408**: Timeout - Increase timeout or reduce complexity
-- **429**: Rate limited - Implement backoff strategy
-- **502**: Model unavailable - Use fallback models
-- **503**: No provider available - Check routing requirements
-
-### ☐ 6.3 Monitor API Credits
-
-```python
-import httpx
-
-async def check_api_credits():
-    """Check OpenRouter API key credits."""
-    async with httpx.AsyncClient() as client:
-        response = await client.get(
-            "https://openrouter.ai/api/v1/key",
-            headers={"Authorization": f"Bearer {api_key}"}
-        )
-        return response.json()
-```
-
-- Implement credit monitoring in production
-- Set up alerts for low credits
-- Log usage patterns for cost optimization
+**Backoff Schedule**:
+- Attempt 1: Immediate
+- Attempt 2: Wait 2s
+- Attempt 3: Wait 4s
+- Attempt 4: Wait 8s (max)
 
 ---
 
-## 📋 Phase 7: Streaming & Performance
+### 3. Usage Tracking
 
-### ☐ 7.1 Implement Streaming for Long Responses
-
+**Access Metrics**:
 ```python
-async def stream_agent_response(prompt: str, deps: MyDependencies):
-    async with agent.run_stream(prompt, deps=deps) as response:
-        async for text in response.stream_text():
-            print(text, end="", flush=True)
-    
-    # Access final validated output
-    final_output = response.output
+result = await agent.run(prompt, deps=deps)
+usage = result.usage()
+
+print(f"Input tokens: {usage.input_tokens}")
+print(f"Output tokens: {usage.output_tokens}")
+print(f"Total tokens: {usage.total_tokens}")
+print(f"Requests made: {usage.requests}")
 ```
 
-- Use `run_stream()` for real-time user feedback
-- Stream text with `stream_text()` for unstructured output
-- Stream structured output with `stream_output()` for Pydantic models
+**Cost Monitoring**:
+- Log token usage per agent run
+- Aggregate metrics for cost analysis
+- Set alerts for abnormal usage patterns
 
-### ☐ 7.2 Implement Event Stream Handlers
+---
 
+### 4. Message History Management
+
+**Maintaining Context Across Runs**:
 ```python
-from pydantic_ai import AgentStreamEvent
+messages: List[ModelMessage] = []
 
-async def handle_events(
-    ctx: RunContext,
-    event_stream: AsyncIterable[AgentStreamEvent],
-):
-    async for event in event_stream:
-        # Log tool calls, think events, etc.
-        if isinstance(event, FunctionToolCallEvent):
-            logger.info(f"Tool called: {event.part.tool_name}")
-```
+# First run
+result = await agent.run("Initial prompt", deps=deps)
+messages.extend(result.new_messages())
 
-- Monitor agent execution in real-time
-- Log important events for debugging
-- Track tool usage patterns
-
-### ☐ 7.3 Configure Usage Limits
-
-```python
-from pydantic_ai import UsageLimits
-
+# Follow-up with context
 result = await agent.run(
-    prompt,
+    "Follow-up question",
     deps=deps,
-    usage_limits=UsageLimits(
-        request_limit=10,           # Max requests in this run
-        response_tokens_limit=8000,  # Max output tokens
-    ),
+    message_history=messages
 )
+messages.extend(result.new_messages())
 ```
 
-- Prevent infinite loops with request limits
-- Control costs with token limits
-- Catch `UsageLimitExceeded` exceptions
+**Conversation Pruning** (for long sessions):
+```python
+def prune_messages(messages: List[ModelMessage], max_length: int = 10) -> List[ModelMessage]:
+    """Keep recent messages, summarize old ones."""
+    if len(messages) <= max_length:
+        return messages
+    return messages[-max_length:]  # Keep last N messages
+```
 
 ---
 
-## 📋 Phase 8: Production Best Practices
+### 5. Structured Logging
 
-### ☐ 8.1 Implement Comprehensive Logging
-
+**Recommended Pattern**:
 ```python
 import structlog
 
 logger = structlog.get_logger()
 
 @agent.tool
-async def logged_tool(ctx: RunContext[MyDependencies]) -> str:
-    logger.info("tool_called", tool_name="logged_tool")
+async def my_tool(ctx: RunContext[CryptoDependencies]) -> dict:
+    logger.info("tool_called", tool_name="my_tool", symbol=ctx.deps.symbol)
+
     try:
         result = await operation()
-        logger.info("tool_success", result_length=len(result))
+        logger.info("tool_success", result_size=len(result))
         return result
     except Exception as e:
-        logger.error("tool_error", error=str(e))
+        logger.error("tool_error", error=str(e), error_type=type(e).__name__)
         raise
 ```
 
-- Log all agent runs with unique IDs
-- Track token usage and costs
-- Monitor tool execution times
-- Log errors with full context
+**Benefits**:
+- Structured JSON logs for easy parsing
+- Contextual debugging information
+- Production observability
 
-### ☐ 8.2 Use Dependency Injection Properly
+---
 
+## Extension Guide
+
+### Adding a New Agent
+
+**Step 1: Define Output Model** (`models/models.py`)
 ```python
-# ❌ Bad: Global state
-database = Database()
-
-@agent.tool
-async def bad_tool() -> str:
-    return database.query()  # Hard to test, not type-safe
-
-# ✅ Good: Injected dependencies
-@agent.tool
-async def good_tool(ctx: RunContext[MyDependencies]) -> str:
-    return await ctx.deps.database.query()  # Testable, type-safe
+class MyAgentOutput(BaseModel):
+    result: str
+    confidence: float = Field(ge=0.0, le=1.0)
 ```
 
-- Never use global variables in tools
-- All external services through dependencies
-- Makes testing and mocking trivial
-
-### ☐ 8.3 Implement Proper Message History Management
-
+**Step 2: Create Agent File** (`agents/my_agent.py`)
 ```python
-from pydantic_ai.messages import ModelMessage, ModelMessagesTypeAdapter
+from config.agent_factory import create_agent
+from models.models import MyAgentOutput
+from deps.dependencies import CryptoDependencies
 
-# Store conversation history
-messages: list[ModelMessage] = []
-
-# First run
-result = await agent.run("Hello", deps=deps)
-messages.extend(result.new_messages())
-
-# Continue conversation
-result = await agent.run(
-    "Follow-up question",
-    deps=deps,
-    message_history=messages,
+my_agent = create_agent(
+    model_name="openai/gpt-4o-mini",
+    system_prompt="You are MyAgent. Your purpose is...",
+    deps_type=CryptoDependencies,
+    result_type=MyAgentOutput
 )
-messages.extend(result.new_messages())
+
+@my_agent.tool
+async def my_tool(ctx: RunContext[CryptoDependencies]) -> dict:
+    """Tool description for LLM."""
+    # Implementation
+    return {"data": "result"}
+
+async def run_my_agent() -> MyAgentOutput:
+    async with httpx.AsyncClient() as client:
+        deps = CryptoDependencies(
+            http_client=client,
+            user_context={"request_id": "my-001"},
+            symbol="BTC-USD"
+        )
+        result = await my_agent.run("Perform task", deps=deps)
+        return result.data
 ```
 
-- Maintain conversation context across runs
-- Serialize messages for persistence
-- Implement message pruning for long conversations
-
-### ☐ 8.4 Handle Long Conversations
-
-```python
-def summarize_old_messages(messages: list[ModelMessage]) -> list[ModelMessage]:
-    """Keep recent messages, summarize old ones."""
-    if len(messages) <= 10:
-        return messages
-    
-    # Keep last 10, summarize older ones
-    recent = messages[-10:]
-    old = messages[:-10]
-    
-    # Create summary message
-    summary = create_summary(old)
-    return [summary] + recent
-```
-
-- Monitor token usage in message history
-- Implement automatic summarization
-- Balance context retention vs. token costs
+**Step 3: Integrate into Pipeline**
+- Add agent call to `coordinator_agent.py` or `editor_agent.py`
+- Update data flow diagram in README
+- Document in this file
 
 ---
 
-## 📋 Phase 9: Testing & Validation
+### Adding a New Data Source
 
-### ☐ 9.1 Write Unit Tests for Tools
-
+**Step 1: Create Adapter** (`tools/my_data_adapter.py`)
 ```python
-import pytest
-from unittest.mock import Mock
+import httpx
+from typing import Dict, Any
 
-@pytest.mark.asyncio
-async def test_my_tool():
-    # Mock dependencies
-    mock_deps = Mock(spec=MyDependencies)
-    mock_deps.database.query.return_value = "test result"
-    
-    # Create mock context
-    ctx = Mock(spec=RunContext)
-    ctx.deps = mock_deps
-    
-    # Test tool
-    result = await my_tool(ctx, "test param")
-    assert result == "test result"
+async def fetch_my_data(
+    http_client: httpx.AsyncClient,
+    param: str
+) -> Dict[str, Any]:
+    """Fetch data from MyDataSource API."""
+    try:
+        response = await http_client.get(
+            f"https://api.mydatasource.com/v1/{param}",
+            timeout=10.0
+        )
+        response.raise_for_status()
+        return response.json()
+    except httpx.HTTPError as e:
+        return {"error": str(e)}
 ```
 
-- Test tools independently of agents
-- Mock dependencies for isolation
-- Test error cases thoroughly
-
-### ☐ 9.2 Test Agent Outputs
-
+**Step 2: Add to Orchestrator** (`tools/blockchain_orchestrator.py`)
 ```python
-@pytest.mark.asyncio
-async def test_agent_output():
-    # Use a cheap/fast model for testing
-    test_model = OpenAIModel(
-        "openrouter/auto",  # Cheapest available
-        base_url="https://openrouter.ai/api/v1",
-        api_key=os.getenv("OPENROUTER_API_KEY"),
+from tools.my_data_adapter import fetch_my_data
+
+class MultiSourceOrchestrator:
+    async def get_my_data(self, param: str) -> BlockchainQueryResult:
+        """Query MyDataSource with fallback."""
+        # Try MyDataSource first
+        result = await fetch_my_data(self.http_client, param)
+        if 'error' not in result:
+            return BlockchainQueryResult(
+                data=result,
+                source='mydatasource',
+                latency_ms=100,
+                confidence_score=0.9
+            )
+
+        # Fallback to alternative source
+        return await self._fallback_query(param)
+```
+
+**Step 3: Create Agent Tool** (`agents/scout_agent.py`)
+```python
+@scout_agent.tool
+async def fetch_from_my_source(
+    ctx: RunContext[CryptoDependencies],
+    param: str
+) -> Dict[str, Any]:
+    """Fetch data from MyDataSource."""
+    orchestrator = get_orchestrator()
+    result = await orchestrator.get_my_data(param)
+    return result.data
+```
+
+---
+
+### Adding Alternative Data
+
+**Step 1: Create Pydantic Model** (`models/models.py`)
+```python
+class MyAlternativeData(BaseModel):
+    metric: float = Field(..., description="Key metric")
+    trend: str = Field(..., description="Trend direction")
+```
+
+**Step 2: Create Adapter** (`tools/alternative_data_adapters.py`)
+```python
+async def fetch_my_alternative_data(
+    http_client: httpx.AsyncClient,
+    asset: str
+) -> MyAlternativeData:
+    """Fetch alternative data for asset."""
+    response = await http_client.get(f"https://api.example.com/{asset}")
+    data = response.json()
+
+    return MyAlternativeData(
+        metric=data['metric'],
+        trend=data['trend']
     )
-    
-    test_agent = Agent[MyDependencies, AgentOutput](
-        test_model,
-        deps_type=MyDependencies,
-        output_type=AgentOutput,
+```
+
+**Step 3: Add to Scout Agent** (`agents/scout_agent.py`)
+```python
+@scout_agent.tool
+async def fetch_my_alternative_data_tool(
+    ctx: RunContext[CryptoDependencies]
+) -> Dict[str, Any]:
+    """Fetch MyAlternativeData for current symbol."""
+    from tools.alternative_data_adapters import fetch_my_alternative_data
+
+    result = await fetch_my_alternative_data(
+        ctx.deps.http_client,
+        ctx.deps.symbol.split('-')[0]  # BTC-USD -> BTC
     )
-    
-    result = await test_agent.run("test prompt", deps=test_deps)
-    
-    # Validate output structure
-    assert isinstance(result.output, AgentOutput)
-    assert result.output.confidence >= 0.0
+
+    return result.model_dump()
 ```
 
-- Create test-specific agents with cheap models
-- Validate output types and structure
-- Test edge cases and error handling
-
-### ☐ 9.3 Implement Integration Tests
-
+**Step 4: Update AlternativeDataMetrics** (`models/models.py`)
 ```python
-@pytest.mark.integration
-@pytest.mark.asyncio
-async def test_full_agent_workflow():
-    """Test complete agent workflow with real dependencies."""
-    result = await agent.run(
-        "Real user prompt",
-        deps=real_dependencies,
-        usage_limits=UsageLimits(request_limit=5),
-    )
-    
-    assert result.output is not None
-    assert result.usage().total_tokens > 0
-```
-
-- Test with real OpenRouter API (separate test key)
-- Monitor actual costs and latency
-- Test multi-turn conversations
-
----
-
-## 📋 Phase 10: Monitoring & Optimization
-
-### ☐ 10.1 Track Usage Metrics
-
-```python
-from pydantic_ai import RunUsage
-
-result = await agent.run(prompt, deps=deps)
-usage: RunUsage = result.usage()
-
-# Log metrics
-logger.info(
-    "agent_run_completed",
-    input_tokens=usage.input_tokens,
-    output_tokens=usage.output_tokens,
-    total_tokens=usage.total_tokens,
-    requests=usage.requests,
-)
-```
-
-- Track token usage per run
-- Monitor request counts
-- Calculate cost per agent run
-- Aggregate metrics for analysis
-
-### ☐ 10.2 Implement Cost Optimization
-
-```python
-# Use cheaper models for simple tasks
-simple_model = OpenAIModel("openrouter/auto", ...)
-complex_model = OpenAIModel("anthropic/claude-3.5-sonnet", ...)
-
-# Route based on complexity
-def get_model_for_task(task_complexity: str):
-    if task_complexity == "simple":
-        return simple_model
-    return complex_model
-```
-
-- Route requests to appropriate model tiers
-- Cache common responses when possible
-- Batch requests where applicable
-
-### ☐ 10.3 Set Up Alerting
-
-```python
-async def run_with_monitoring(prompt: str, deps: MyDependencies):
-    result = await agent.run(prompt, deps=deps)
-    usage = result.usage()
-    
-    # Alert on high costs
-    if usage.total_tokens > 10000:
-        await send_alert(f"High token usage: {usage.total_tokens}")
-    
-    # Alert on errors
-    if result.output.confidence < 0.3:
-        await send_alert("Low confidence output detected")
-    
-    return result
-```
-
-- Monitor for unusual token usage
-- Alert on repeated failures
-- Track degraded performance
-
----
-
-## 📋 Phase 11: Security & Compliance
-
-### ☐ 11.1 Secure API Key Management
-
-- Store keys in environment variables or secret managers
-- Rotate API keys regularly
-- Use separate keys for dev/staging/production
-- Never log API keys
-
-### ☐ 11.2 Implement Input Validation
-
-```python
-def validate_user_input(user_input: str) -> str:
-    """Validate and sanitize user input."""
-    if len(user_input) > 10000:
-        raise ValueError("Input too long")
-    
-    # Remove/escape potentially dangerous content
-    sanitized = sanitize_input(user_input)
-    return sanitized
-```
-
-- Validate input length and format
-- Sanitize user-provided content
-- Implement rate limiting per user
-
-### ☐ 11.3 Handle Sensitive Data
-
-```python
-@dataclass
-class SecureDependencies:
-    database: DatabaseConnection
-    
-    def get_user_data(self, user_id: str) -> dict:
-        """Fetch user data with PII redaction."""
-        data = self.database.get_user(user_id)
-        return redact_pii(data)
-```
-
-- Redact PII before sending to LLM
-- Log without sensitive information
-- Comply with data protection regulations
-
-### ☐ 11.4 Configure OpenRouter Privacy
-
-```python
-# Use OpenRouter headers for privacy
-model = OpenAIModel(
-    "anthropic/claude-3.5-sonnet",
-    base_url="https://openrouter.ai/api/v1",
-    api_key=os.getenv("OPENROUTER_API_KEY"),
-    http_client=httpx.AsyncClient(
-        headers={
-            "HTTP-Referer": "https://your-app.com",
-            "X-Title": "Your App Name",
-        }
-    ),
-)
-```
-
-- Set HTTP-Referer for request attribution
-- Use X-Title for app identification
-- Review OpenRouter's data usage policies
-
----
-
-## 📋 Phase 12: Documentation & Maintenance
-
-### ☐ 12.1 Document Agent Purpose
-
-```python
-"""
-Customer Support Agent
-
-Purpose: Handle customer inquiries about orders and products
-Models: Claude 3.5 Sonnet (primary), GPT-4 (fallback)
-Cost: ~$0.02 per average interaction
-Latency: 2-5 seconds typical response time
-
-Dependencies:
-- OrderDatabase: Query order information
-- ProductCatalog: Fetch product details
-- EmailService: Send follow-up emails
-"""
-```
-
-### ☐ 12.2 Document Tool Functions
-
-```python
-@agent.tool
-async def fetch_order(ctx: RunContext[MyDependencies], order_id: str) -> str:
-    """
-    Fetch order details for a customer.
-    
-    Args:
-        order_id: The unique order identifier (format: ORD-XXXXX)
-        
-    Returns:
-        JSON string with order details including status, items, and tracking
-        
-    Raises:
-        ModelRetry: If order service is temporarily unavailable
-        
-    Example:
-        > fetch_order("ORD-12345")
-        '{"status": "shipped", "tracking": "TRK123", ...}'
-    """
-```
-
-### ☐ 12.3 Maintain Configuration Documentation
-
-```yaml
-# config/agents.yaml
-customer_support_agent:
-  model: anthropic/claude-3.5-sonnet
-  temperature: 0.7
-  max_tokens: 4096
-  tools:
-    - fetch_order
-    - search_products
-    - send_email
-  rate_limits:
-    requests_per_minute: 60
-    max_concurrent: 10
-```
-
-### ☐ 12.4 Create Runbooks
-
-```markdown
-# Agent Troubleshooting Runbook
-
-## High Token Usage
-1. Check message history length
-2. Verify summarization is working
-3. Review tool output sizes
-
-## Low Confidence Outputs
-1. Check output validators
-2. Review recent prompt changes
-3. Test with multiple models
-
-## Rate Limit Errors
-1. Check OpenRouter credits
-2. Verify backoff implementation
-3. Review request patterns
+class AlternativeDataMetrics(BaseModel):
+    # ... existing fields ...
+    my_alternative_data: Optional[MyAlternativeData] = None
 ```
 
 ---
 
-## ✅ Final Checklist Review
+## Current State & Direction
 
-Before deploying to production:
+### System Maturity (v0.4.0)
 
-- [ ] All dependencies properly typed and injected
-- [ ] Structured outputs defined with Pydantic models
-- [ ] Error handling with retries and fallbacks
-- [ ] Comprehensive logging implemented
-- [ ] Usage limits configured appropriately
-- [ ] Tests cover tools, outputs, and workflows
-- [ ] Monitoring and alerting set up
-- [ ] Security review completed
-- [ ] Documentation is complete and current
-- [ ] Cost projections reviewed
-- [ ] Rate limiting strategy tested
-- [ ] Message history management working
-- [ ] Fallback models configured
-- [ ] API keys secured properly
-- [ ] Performance benchmarks established
+**Completed** ✅:
+- ✅ Core agent architecture with PydanticAI
+- ✅ Multi-source blockchain data integration
+- ✅ Alternative data sources (news, social, trends, dev activity, options)
+- ✅ Dependency injection with `CryptoDependencies`
+- ✅ Production resilience (retries, fallbacks, validation)
+- ✅ File-based caching system (hot/warm/cold)
+- ✅ Logic Matrix for strategy synthesis
+- ✅ Comprehensive data models with Pydantic
+- ✅ OpenRouter integration with model selection
+- ✅ Structured artifact persistence (JSON reports)
+
+**In Progress** 🚧:
+- Documentation improvements (this file)
+- Test coverage expansion
+- Performance benchmarking
+
+**Planned** 📋:
+- Real-time streaming data support
+- WebSocket integrations for live price feeds
+- Advanced caching with TTL optimization
+- Multi-asset portfolio analysis
+- Backtesting framework integration
+- API endpoint exposure (FastAPI)
+
+### Future Enhancements
+
+**Phase 1: Real-Time Capabilities**
+- Integrate WebSocket feeds from Binance/Coinbase
+- Stream-based technical analysis updates
+- Live on-chain monitoring (Dune Analytics webhooks)
+
+**Phase 2: Portfolio Management**
+- Multi-asset correlation analysis
+- Portfolio optimization agent
+- Risk allocation across assets
+
+**Phase 3: Backtesting & Validation**
+- Historical directive evaluation
+- Strategy performance metrics
+- Automated parameter tuning
+
+**Phase 4: Production API**
+- FastAPI wrapper for agent pipeline
+- Authentication and rate limiting
+- Webhook notifications for directive updates
 
 ---
 
-## 📚 Key Resources
+## Conclusion
 
-- [PydanticAI Documentation](https://ai.pydantic.dev)
-- [OpenRouter Documentation](https://openrouter.ai/docs)
-- [OpenRouter Models](https://openrouter.ai/models)
-- [PydanticAI GitHub](https://github.com/pydantic/pydantic-ai)
-- [OpenRouter API Reference](https://openrouter.ai/docs/api/reference)
-- [PydanticAI Examples](https://ai.pydantic.dev/examples/)
+The Antigravity Microanalyst Team demonstrates a production-grade multi-agent architecture built on modern AI engineering principles:
+
+- **Type Safety**: Pydantic models ensure data integrity
+- **Modularity**: Clear separation of concerns across specialized agents
+- **Resilience**: Comprehensive error handling and retry logic
+- **Observability**: Structured artifacts enable full audit trails
+- **Extensibility**: Well-defined patterns for adding agents, tools, and data sources
+
+This architecture provides a solid foundation for building sophisticated trading analysis systems with AI agents.
 
 ---
 
-This checklist provides a comprehensive, chronological approach to implementing production-grade PydanticAI agents with OpenRouter. Follow each phase sequentially, and check off items as you implement them to ensure nothing is missed.
+**Document Version**: 1.0.0
+**Last Updated**: 2025-12-29
+**Codebase Version**: v0.4.0
