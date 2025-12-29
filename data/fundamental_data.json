@@ -1,0 +1,24 @@
+{
+  "module_2_macro": {
+    "metrics": {
+      "spx_level": 6929.94,
+      "dxy_index": 98.0,
+      "macro_regime": "Risk_On"
+    }
+  },
+  "module_3_onchain": {
+    "metrics": {
+      "exchange_net_flow": "Negative",
+      "active_addresses_trend": "Rising",
+      "whale_accumulation": "High"
+    }
+  },
+  "module_4_sentiment": {
+    "metrics": {
+      "fear_greed_index": 65,
+      "social_volume": "Elevated",
+      "sentiment_signal": "Buy"
+    }
+  },
+  "timestamp_utc": "2025-12-29T03:46:23.883462"
+}

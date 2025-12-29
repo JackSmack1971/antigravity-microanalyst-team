@@ -1,0 +1,53 @@
+{
+  "module_1_price_structure": {
+    "asset": "BTC-USD",
+    "metrics": {
+      "current_price": 89762.17,
+      "rsi_4h": 85.33,
+      "vwap_deviation": 2.26,
+      "regime": "Trending_Up"
+    },
+    "risk_profile": {
+      "invalidation_hard_stop": 83292.27,
+      "support_zone": [
+        85922.56,
+        87676.08
+      ],
+      "resistance_zone": [
+        94250.28,
+        96045.52
+      ]
+    }
+  },
+  "module_5_market_microstructure": {
+    "metrics": {
+      "funding_rate_bias": "Neutral",
+      "open_interest_trend": "Rising",
+      "squeeze_risk": "High"
+    }
+  },
+  "timestamp_utc": "2025-12-29T03:46:23.883462",
+  "module_2_macro": {
+    "metrics": {
+      "spx_level": 6929.94,
+      "dxy_index": 98.0,
+      "macro_regime": "Risk_On"
+    }
+  },
+  "module_3_onchain": {
+    "metrics": {
+      "exchange_net_flow": "Negative",
+      "active_addresses_trend": "Rising",
+      "whale_accumulation": "High"
+    }
+  },
+  "module_4_sentiment": {
+    "metrics": {
+      "fear_greed_index": 65,
+      "social_volume": "Elevated",
+      "sentiment_signal": "Buy"
+    }
+  },
+  "status": "OK",
+  "aggregation_timestamp": "2025-12-29T03:46:29.479493"
+}
