@@ -9,6 +9,11 @@ The Antigravity Microanalyst Team is a specialized swarm of AI agents designed t
 ### What's New
 
 **Recent Enhancements** (December 2025):
+- **New Specialized Agents**: Added 4 complementary agents for comprehensive analysis
+  - Risk Manager: Position sizing, stop-loss/take-profit recommendations, tail risk assessment
+  - Scenario Planner: What-if analysis with probability-weighted outcomes
+  - Anomaly Detection: Pattern detection for unusual market behavior and opportunities
+  - Validator: Quality assurance and consistency checking across all outputs
 - **Comprehensive On-Chain Data Integration**: Access real blockchain data from 4+ free sources without expensive subscriptions
 - **Alternative Data Intelligence**: Capture market sentiment, social trends, and developer activity before they impact prices
 - **Zero-Config Quick Start**: Core features work immediately with DeFiLlama and CoinGecko (no API keys required)
@@ -17,12 +22,21 @@ The Antigravity Microanalyst Team is a specialized swarm of AI agents designed t
 
 ## Core Agents
 
+### Data Collection Agents
 - **Quant Agent**: Performs technical analysis, calculates indicators (EMA, RSI), and identifies market regimes.
 - **Scout Agent**: Gathers macro context and real on-chain data from multiple free blockchain data sources (DeFiLlama, CoinGecko, Dune Analytics). Enhanced with alternative data from news sentiment, social media, and market trends.
 - **Blockchain Agent**: Specialized agent for comprehensive on-chain analysis using multi-source orchestration. Provides TVL tracking, protocol metrics, exchange flows, and whale wallet monitoring across multiple chains.
+
+### Analysis & Output Agents
 - **Coordinator Agent**: Aggregates data from Quant and Scout agents into a unified Master State.
 - **Lead Analyst Agent**: Synthesizes the Master State using a strict Logic Matrix to produce trading directives.
 - **Editor Agent**: Transforms technical directives into polished, human-readable executive summaries.
+
+### Complementary Analysis Agents
+- **Risk Manager Agent**: Dedicated risk assessment with position sizing recommendations, stop-loss/take-profit levels, and tail risk analysis.
+- **Scenario Planner Agent**: Generates what-if market scenarios with probability assessments and identifies key catalysts and invalidation levels.
+- **Anomaly Detection Agent**: Identifies unusual market behavior, volume spikes, whale movements, and microstructure anomalies for trading opportunities.
+- **Validator Agent**: Cross-checks analysis outputs for consistency, validates Logic Matrix application, and ensures report quality.
 
 ## Architecture
 
@@ -138,6 +152,12 @@ graph TB
 **Phase 4: Report Generation**
 - **Editor Agent**: Transforms technical directives into human-readable executive summaries
 
+**Phase 5: Complementary Analysis** (Optional)
+- **Risk Manager Agent**: Calculates position sizing, stop-loss/take-profit levels, and tail risk metrics
+- **Scenario Planner Agent**: Models bull/bear/base scenarios with probability assessments
+- **Anomaly Detection Agent**: Identifies unusual patterns, volume spikes, and whale movements
+- **Validator Agent**: Cross-checks outputs for consistency and validates Logic Matrix application
+
 ## Setup
 
 ### Prerequisites
@@ -192,6 +212,26 @@ python -m agents.blockchain_agent
 **Scout Analysis** (includes news sentiment, social media, trends):
 ```bash
 python -m agents.scout_agent BTC
+```
+
+**Risk Assessment** (position sizing, stop-loss, tail risk):
+```bash
+python -m agents.risk_manager_agent BTC-USD 10000 2.0
+```
+
+**Scenario Planning** (what-if analysis with probabilities):
+```bash
+python -m agents.scenario_planner_agent BTC-USD "1 week"
+```
+
+**Anomaly Detection** (unusual patterns and opportunities):
+```bash
+python -m agents.anomaly_detection_agent BTC-USD
+```
+
+**Quality Validation** (consistency checks and logic validation):
+```bash
+python -m agents.validator_agent BTC-USD
 ```
 
 ### Quick Examples
