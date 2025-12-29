@@ -3,3 +3,10 @@ yfinance>=1.0
 pandas
 matplotlib
 seaborn
+
+# Blockchain data sources
+aiohttp>=3.9.0
+tenacity>=8.2.0
+
+# Optional: Redis for advanced caching (file-based caching works without this)
+# redis>=5.0.0
