@@ -27,13 +27,116 @@ The Antigravity Microanalyst Team is a specialized swarm of AI agents designed t
 ## Architecture
 
 ```mermaid
-graph TD
-    A[Quant Agent] --> C[Coordinator Agent]
-    B[Scout Agent] --> C
-    C --> D[Lead Analyst Agent]
-    D --> E[Editor Agent]
-    E --> F[Markdown Report]
+graph TB
+    subgraph "Data Sources"
+        DS1[yfinance<br/>Market Data]
+        DS2[DeFiLlama<br/>TVL & Protocols]
+        DS3[CoinGecko<br/>Token Prices]
+        DS4[CryptoPanic<br/>News Sentiment]
+        DS5[Reddit<br/>Social Sentiment]
+        DS6[Google Trends<br/>Search Interest]
+        DS7[GitHub<br/>Dev Activity]
+        DS8[Deribit<br/>Options Data]
+        DS9[Dune Analytics<br/>On-Chain Queries]
+        DS10[Etherscan<br/>Wallet & Txns]
+    end
+
+    subgraph "Orchestration Layer"
+        ORC[Blockchain Orchestrator<br/>Multi-Source Routing & Fallback]
+        ALT[Alternative Data Adapters<br/>Sentiment & Trend Analysis]
+    end
+
+    subgraph "Data Collection Agents"
+        QA[Quant Agent<br/>Technical Analysis]
+        SA[Scout Agent<br/>Fundamental & Macro]
+        BA[Blockchain Agent<br/>On-Chain Analysis]
+    end
+
+    subgraph "Data Artifacts"
+        TD[technical_data.json]
+        FD[fundamental_data.json]
+        BDA[blockchain_analysis.json]
+        MS[master_state.json]
+        FDR[FINAL_DIRECTIVE_*.json]
+    end
+
+    subgraph "Analysis & Output"
+        CA[Coordinator Agent<br/>Data Aggregation]
+        LA[Lead Analyst Agent<br/>Strategy Synthesis]
+        EA[Editor Agent<br/>Report Generation]
+        REP[EXECUTIVE_SUMMARY_*.md]
+    end
+
+    %% Data Source Connections
+    DS1 --> QA
+    DS1 --> SA
+    DS2 --> ORC
+    DS3 --> ORC
+    DS4 --> ALT
+    DS5 --> ALT
+    DS6 --> ALT
+    DS7 --> ALT
+    DS8 --> ALT
+    DS9 --> ORC
+    DS10 --> ORC
+
+    %% Orchestrator to Agents
+    ORC --> SA
+    ORC --> BA
+    ALT --> SA
+
+    %% Agent to Artifact Flow
+    QA --> TD
+    SA --> FD
+    BA --> BDA
+
+    %% Coordinator Flow
+    TD --> CA
+    FD --> CA
+    CA --> MS
+
+    %% Analysis Flow
+    MS --> LA
+    LA --> FDR
+    FDR --> EA
+    EA --> REP
+
+    style DS1 fill:#e1f5ff
+    style DS2 fill:#e1f5ff
+    style DS3 fill:#e1f5ff
+    style DS4 fill:#fff4e1
+    style DS5 fill:#fff4e1
+    style DS6 fill:#fff4e1
+    style DS7 fill:#fff4e1
+    style DS8 fill:#fff4e1
+    style DS9 fill:#e1f5ff
+    style DS10 fill:#e1f5ff
+    style ORC fill:#f0e1ff
+    style ALT fill:#f0e1ff
+    style QA fill:#e8f5e9
+    style SA fill:#e8f5e9
+    style BA fill:#e8f5e9
+    style CA fill:#fff3e0
+    style LA fill:#fff3e0
+    style EA fill:#fff3e0
+    style REP fill:#ffebee
 ```
+
+### Architecture Flow
+
+**Phase 1: Parallel Data Collection**
+- **Quant Agent**: Fetches price data from yfinance, calculates technical indicators (EMA, RSI, volatility)
+- **Scout Agent**: Gathers macro indicators, DeFi metrics, token prices, and alternative data (news sentiment, social trends, dev activity)
+- **Blockchain Agent**: Performs specialized on-chain analysis using multi-source orchestration
+
+**Phase 2: Data Aggregation**
+- **Coordinator Agent**: Merges technical and fundamental data into a unified Master State
+
+**Phase 3: Strategic Analysis**
+- **Lead Analyst Agent**: Applies Logic Matrix to synthesize trading directives from Master State
+
+**Phase 4: Report Generation**
+- **Editor Agent**: Transforms technical directives into human-readable executive summaries
 
 ## Setup
 
