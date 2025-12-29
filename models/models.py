@@ -181,3 +181,47 @@ class ValidationReport(BaseModel):
     logic_quality_score: int = Field(..., ge=0, le=100, description="Logic quality score")
     summary: str = Field(..., description="Summary of validation findings")
     timestamp_utc: datetime
+
+# Correlation & Market Regime Analyzer Models
+class AssetCorrelation(BaseModel):
+    """Correlation between two assets."""
+    asset_pair: str = Field(..., description="Asset pair name (e.g., 'BTC-SPX', 'BTC-DXY')")
+    correlation_coefficient: float = Field(..., ge=-1, le=1, description="Pearson correlation coefficient")
+    rolling_30d: float = Field(..., ge=-1, le=1, description="30-day rolling correlation")
+    rolling_90d: float = Field(..., ge=-1, le=1, description="90-day rolling correlation")
+    trend: str = Field(..., description="Correlation trend (strengthening/weakening/stable)")
+    interpretation: str = Field(..., description="What this correlation means for trading")
+
+class MarketRegime(BaseModel):
+    """Current market regime classification."""
+    regime_type: str = Field(..., description="Regime type (risk_on/risk_off/transitional/decoupled)")
+    confidence: float = Field(..., ge=0, le=1, description="Confidence in regime classification")
+    duration_days: int = Field(..., description="Days since regime started")
+    characteristics: List[str] = Field(..., description="Key characteristics of current regime")
+    stability: str = Field(..., description="Regime stability (stable/volatile/shifting)")
+
+class CorrelationBreakdown(BaseModel):
+    """Detection of correlation breakdown events."""
+    event_type: str = Field(..., description="Type of breakdown (flight_to_quality/decoupling/contagion)")
+    severity: int = Field(..., ge=0, le=100, description="Severity of breakdown (0=minor, 100=severe)")
+    affected_assets: List[str] = Field(..., description="Assets affected by the breakdown")
+    description: str = Field(..., description="Description of the breakdown event")
+    trading_implications: str = Field(..., description="What this means for trading strategy")
+
+class ContagionRisk(BaseModel):
+    """Cross-asset contagion risk assessment."""
+    risk_level: str = Field(..., description="Risk level (low/moderate/high/extreme)")
+    risk_score: int = Field(..., ge=0, le=100, description="Quantitative risk score")
+    transmission_paths: List[str] = Field(..., description="Potential contagion transmission paths")
+    vulnerable_assets: List[str] = Field(..., description="Assets most vulnerable to contagion")
+    mitigation_strategies: List[str] = Field(..., description="Strategies to mitigate contagion risk")
+
+class CorrelationMarketRegimeAnalysis(BaseModel):
+    """Complete correlation and market regime analysis output."""
+    correlations: List[AssetCorrelation] = Field(..., description="Asset correlation analysis")
+    current_regime: MarketRegime = Field(..., description="Current market regime")
+    correlation_breakdowns: List[CorrelationBreakdown] = Field(..., description="Detected correlation breakdowns")
+    contagion_risk: ContagionRisk = Field(..., description="Cross-asset contagion risk assessment")
+    key_insights: List[str] = Field(..., description="Key actionable insights from the analysis")
+    regime_outlook: str = Field(..., description="Outlook for regime continuation or change")
+    timestamp_utc: datetime
