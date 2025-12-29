@@ -114,3 +114,70 @@ class FinalDirective(BaseModel):
     report_metadata: ReportMetadata
     final_directive: DirectiveContent
     thesis_summary: str = Field(..., description="String explaining the synthesis of winning signals.")
+
+# Risk Manager Agent Models
+class RiskAssessment(BaseModel):
+    """Risk assessment output from Risk Manager Agent."""
+    position_size_btc: float = Field(..., description="Recommended position size in BTC")
+    portfolio_risk_percentage: float = Field(..., ge=0, le=100, description="Percentage of portfolio at risk")
+    stop_loss_price: float = Field(..., description="Recommended stop-loss price level")
+    take_profit_targets: List[float] = Field(..., description="List of take-profit target prices")
+    max_drawdown_estimate: float = Field(..., description="Estimated maximum drawdown percentage")
+    tail_risk_score: int = Field(..., ge=0, le=100, description="Tail risk score (0=low, 100=extreme)")
+    correlation_warning: Optional[str] = Field(None, description="Warning about correlation risks if applicable")
+    timestamp_utc: datetime
+
+# Scenario Planner Agent Models
+class MarketScenario(BaseModel):
+    """Individual market scenario projection."""
+    name: str = Field(..., description="Scenario name (e.g., 'Bull Case', 'Bear Case', 'Base Case')")
+    description: str = Field(..., description="Detailed scenario description")
+    probability: float = Field(..., ge=0, le=1, description="Probability of scenario occurring")
+    price_target: float = Field(..., description="Price target for this scenario")
+    timeframe: str = Field(..., description="Expected timeframe (e.g., '1 week', '1 month')")
+    key_drivers: List[str] = Field(..., description="Key drivers for this scenario")
+
+class ScenarioAnalysis(BaseModel):
+    """Scenario analysis output from Scenario Planner Agent."""
+    scenarios: List[MarketScenario] = Field(..., description="List of market scenarios")
+    most_likely_scenario: str = Field(..., description="Name of most likely scenario")
+    probability_distribution: dict[str, float] = Field(..., description="Map of scenario name to probability")
+    key_catalysts: List[str] = Field(..., description="Key catalysts to monitor")
+    invalidation_levels: dict[str, float] = Field(..., description="Price levels that invalidate scenarios")
+    timestamp_utc: datetime
+
+# Anomaly Detection Agent Models
+class Anomaly(BaseModel):
+    """Individual anomaly detection."""
+    type: str = Field(..., description="Type of anomaly (e.g., 'volume_spike', 'whale_transaction', 'unusual_price_movement')")
+    severity: int = Field(..., ge=0, le=100, description="Severity score (0=minor, 100=critical)")
+    description: str = Field(..., description="Detailed description of the anomaly")
+    detected_at: datetime = Field(..., description="When the anomaly was detected")
+    impact: str = Field(..., description="Potential market impact (bullish/bearish/neutral)")
+
+class AnomalyReport(BaseModel):
+    """Anomaly detection output from Anomaly Detection Agent."""
+    anomalies_detected: List[Anomaly] = Field(..., description="List of detected anomalies")
+    severity_scores: dict[str, int] = Field(..., description="Map of anomaly type to severity score")
+    recommended_actions: List[str] = Field(..., description="Recommended actions based on anomalies")
+    monitoring_alerts: List[str] = Field(..., description="Alerts for ongoing monitoring")
+    timestamp_utc: datetime
+
+# Validator Agent Models
+class ValidationIssue(BaseModel):
+    """Individual validation issue found."""
+    severity: str = Field(..., description="Severity level (critical/warning/info)")
+    component: str = Field(..., description="Component with the issue (e.g., 'Quant Agent', 'Logic Matrix')")
+    issue_type: str = Field(..., description="Type of issue (e.g., 'data_mismatch', 'logical_inconsistency', 'unsupported_claim')")
+    description: str = Field(..., description="Detailed description of the issue")
+    recommendation: str = Field(..., description="Recommended fix or action")
+
+class ValidationReport(BaseModel):
+    """Validation output from Validator Agent."""
+    validation_passed: bool = Field(..., description="Whether validation passed overall")
+    issues_found: List[ValidationIssue] = Field(..., description="List of validation issues")
+    consistency_score: int = Field(..., ge=0, le=100, description="Overall consistency score")
+    data_quality_score: int = Field(..., ge=0, le=100, description="Data quality score")
+    logic_quality_score: int = Field(..., ge=0, le=100, description="Logic quality score")
+    summary: str = Field(..., description="Summary of validation findings")
+    timestamp_utc: datetime

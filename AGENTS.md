@@ -79,7 +79,29 @@ The system follows a modular, pipeline-based architecture where specialized agen
 │                  │                    │                         │
 │                  │  Report Generation │                         │
 │                  │  Human-Readable    │                         │
-│                  └────────────────────┘                         │
+│                  └─────────┬──────────┘                         │
+│                            │                                    │
+└────────────────────────────┼────────────────────────────────────┘
+                             │
+┌────────────────────────────┼────────────────────────────────────┐
+│              COMPLEMENTARY ANALYSIS PHASE (OPTIONAL)             │
+├────────────────────────────┼────────────────────────────────────┤
+│                            │                                    │
+│  ┌─────────────┐  ┌───────▼─────────┐  ┌──────────────┐       │
+│  │   Risk      │  │   Scenario      │  │   Anomaly    │       │
+│  │  Manager    │  │   Planner       │  │  Detection   │       │
+│  │             │  │                 │  │              │       │
+│  │ Position    │  │ What-If         │  │ Pattern      │       │
+│  │ Sizing &    │  │ Scenarios &     │  │ Detection &  │       │
+│  │ Stop-Loss   │  │ Probabilities   │  │ Alerts       │       │
+│  └─────────────┘  └─────────────────┘  └──────────────┘       │
+│                                                                   │
+│                  ┌─────────────────┐                            │
+│                  │   Validator     │                            │
+│                  │                 │                            │
+│                  │  QA & Logic     │                            │
+│                  │  Consistency    │                            │
+│                  └─────────────────┘                            │
 │                                                                   │
 └───────────────────────────────────────────────────────────────────┘
 ```
@@ -334,6 +356,184 @@ python -m agents.editor_agent
 
 ---
 
+### 7. Risk Manager Agent (`agents/risk_manager_agent.py`)
+
+**Purpose**: Dedicated risk assessment and position sizing recommendations.
+
+**Model**: `openai/gpt-4o-mini` via OpenRouter
+
+**Input Dependencies**:
+- `CryptoDependencies`
+
+**Output Type**: `RiskAssessment`
+
+**Tools**:
+- `load_master_state()`: Loads aggregated market data for risk analysis
+- `load_final_directive()`: Retrieves current directive and stance
+- `calculate_position_metrics()`: Calculates position sizing based on volatility and risk tolerance
+
+**Responsibilities**:
+- Calculate appropriate position sizes based on portfolio risk tolerance
+- Monitor correlation risks across crypto assets
+- Assess tail risk scenarios (black swan events)
+- Generate stop-loss and take-profit recommendations
+- Estimate maximum drawdown based on volatility
+- Provide risk-adjusted leverage recommendations
+
+**Output Artifact**: `data/risk_assessment.json`
+
+**Output Model**:
+```python
+class RiskAssessment(BaseModel):
+    position_size_btc: float
+    portfolio_risk_percentage: float
+    stop_loss_price: float
+    take_profit_targets: List[float]
+    max_drawdown_estimate: float
+    tail_risk_score: int  # 0-100
+    correlation_warning: Optional[str]
+```
+
+**Example Usage**:
+```bash
+python -m agents.risk_manager_agent BTC-USD 10000 2.0
+```
+
+---
+
+### 8. Scenario Planner Agent (`agents/scenario_planner_agent.py`)
+
+**Purpose**: Generate what-if market scenarios with probability assessments.
+
+**Model**: `openai/gpt-4o` via OpenRouter (uses more capable model for complex scenario analysis)
+
+**Input Dependencies**:
+- `CryptoDependencies`
+
+**Output Type**: `ScenarioAnalysis`
+
+**Tools**:
+- `load_master_state()`: Loads market data for scenario modeling
+- `load_final_directive()`: Retrieves current analytical stance
+- `calculate_price_targets()`: Calculates scenario-based price targets using technical levels
+
+**Responsibilities**:
+- Model bull/bear/base case market scenarios
+- Assess impact of macro events (Fed decisions, regulatory changes)
+- Generate probability-weighted outcomes
+- Identify key price levels and catalysts
+- Define invalidation levels for each scenario
+- Provide timeframe estimates for scenario realization
+
+**Output Artifact**: `data/scenario_analysis.json`
+
+**Output Model**:
+```python
+class ScenarioAnalysis(BaseModel):
+    scenarios: List[MarketScenario]
+    most_likely_scenario: str
+    probability_distribution: Dict[str, float]
+    key_catalysts: List[str]
+    invalidation_levels: Dict[str, float]
+```
+
+**Example Usage**:
+```bash
+python -m agents.scenario_planner_agent BTC-USD "1 week"
+```
+
+---
+
+### 9. Anomaly Detection Agent (`agents/anomaly_detection_agent.py`)
+
+**Purpose**: Identify unusual market behavior and potential trading opportunities.
+
+**Model**: `openai/gpt-4o-mini` via OpenRouter
+
+**Input Dependencies**:
+- `CryptoDependencies`
+
+**Output Type**: `AnomalyReport`
+
+**Tools**:
+- `load_technical_data()`: Loads technical indicators for anomaly detection
+- `load_fundamental_data()`: Loads on-chain and sentiment data
+- `detect_statistical_anomalies()`: Performs z-score based anomaly detection
+
+**Responsibilities**:
+- Detect volume spikes and unusual price movements
+- Identify extreme technical indicator readings
+- Flag unusual on-chain activity (whale movements, exchange flows)
+- Monitor sentiment extremes (Fear & Greed Index)
+- Detect microstructure anomalies (funding rate extremes, OI spikes)
+- Flag macro regime shifts or correlation breakdowns
+- Provide actionable recommendations based on anomalies
+
+**Output Artifact**: `data/anomaly_report.json`
+
+**Output Model**:
+```python
+class AnomalyReport(BaseModel):
+    anomalies_detected: List[Anomaly]
+    severity_scores: Dict[str, int]
+    recommended_actions: List[str]
+    monitoring_alerts: List[str]
+```
+
+**Example Usage**:
+```bash
+python -m agents.anomaly_detection_agent BTC-USD
+```
+
+---
+
+### 10. Validator Agent (`agents/validator_agent.py`)
+
+**Purpose**: Cross-check analysis outputs for consistency and quality.
+
+**Model**: `openai/gpt-4o` via OpenRouter (uses more capable model for complex validation logic)
+
+**Input Dependencies**:
+- `CryptoDependencies`
+
+**Output Type**: `ValidationReport`
+
+**Tools**:
+- `load_technical_data()`: Loads technical data for validation
+- `load_fundamental_data()`: Loads fundamental data for validation
+- `load_master_state()`: Loads aggregated state for cross-checking
+- `load_final_directive()`: Loads directive for logic validation
+- `validate_data_integrity()`: Validates field consistency across outputs
+
+**Responsibilities**:
+- Validate that Quant + Scout data matches Coordinator output
+- Check for logical inconsistencies in Analyst directives
+- Flag contradictions between stance and market conditions
+- Verify that conviction scores align with evidence strength
+- Detect unsupported claims in thesis summaries
+- Assess overall data quality and consistency
+- Generate quality scores for consistency, data, and logic
+
+**Output Artifact**: `data/validation_report.json`
+
+**Output Model**:
+```python
+class ValidationReport(BaseModel):
+    validation_passed: bool
+    issues_found: List[ValidationIssue]
+    consistency_score: int  # 0-100
+    data_quality_score: int  # 0-100
+    logic_quality_score: int  # 0-100
+    summary: str
+```
+
+**Example Usage**:
+```bash
+python -m agents.validator_agent BTC-USD
+```
+
+---
+
 ## Agent Factory & Configuration
 
 ### Factory Pattern (`config/agent_factory.py`)
@@ -377,8 +577,12 @@ quant_agent = create_agent(
 | Coordinator | `gpt-4o-mini` | Simple aggregation logic |
 | **Lead Analyst** | `gpt-4o` | Complex reasoning for Logic Matrix application |
 | Editor | `gpt-4o-mini` | Straightforward text transformation |
+| **Risk Manager** | `gpt-4o-mini` | Efficient risk calculations and position sizing |
+| **Scenario Planner** | `gpt-4o` | Complex scenario modeling requires advanced reasoning |
+| **Anomaly Detection** | `gpt-4o-mini` | Pattern detection and statistical analysis |
+| **Validator** | `gpt-4o` | Complex validation logic and consistency checking |
 
-**Cost Optimization**: Only the Lead Analyst uses the premium `gpt-4o` model where reasoning quality is critical.
+**Cost Optimization**: Only the Lead Analyst, Scenario Planner, and Validator use the premium `gpt-4o` model where complex reasoning quality is critical.
 
 ---
 
@@ -1129,7 +1333,7 @@ class AlternativeDataMetrics(BaseModel):
 
 ## Current State & Direction
 
-### System Maturity (v0.4.0)
+### System Maturity (v0.5.0)
 
 **Completed** ✅:
 - ✅ Core agent architecture with PydanticAI
@@ -1142,11 +1346,16 @@ class AlternativeDataMetrics(BaseModel):
 - ✅ Comprehensive data models with Pydantic
 - ✅ OpenRouter integration with model selection
 - ✅ Structured artifact persistence (JSON reports)
+- ✅ **Risk Manager Agent** - Position sizing and risk assessment
+- ✅ **Scenario Planner Agent** - What-if scenario modeling
+- ✅ **Anomaly Detection Agent** - Unusual pattern detection
+- ✅ **Validator Agent** - Quality assurance and consistency checking
 
 **In Progress** 🚧:
 - Documentation improvements (this file)
 - Test coverage expansion
 - Performance benchmarking
+- Integration of new agents into main pipeline
 
 **Planned** 📋:
 - Real-time streaming data support
