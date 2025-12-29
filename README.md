@@ -9,11 +9,13 @@ The Antigravity Microanalyst Team is a specialized swarm of AI agents designed t
 ### What's New
 
 **Recent Enhancements** (December 2025):
-- **New Specialized Agents**: Added 4 complementary agents for comprehensive analysis
+- **New Specialized Agents**: Added 6 complementary agents for comprehensive analysis
   - Risk Manager: Position sizing, stop-loss/take-profit recommendations, tail risk assessment
   - Scenario Planner: What-if analysis with probability-weighted outcomes
   - Anomaly Detection: Pattern detection for unusual market behavior and opportunities
   - Validator: Quality assurance and consistency checking across all outputs
+  - Black Swan Detector: Monitors extreme market events, price movements >10%, volume spikes >5x, and generates emergency response recommendations
+  - Correlation & Market Regime Analyzer: Analyzes cross-asset correlations and detects market regime changes (risk_on/risk_off/transitional/decoupled)
 - **Comprehensive On-Chain Data Integration**: Access real blockchain data from 4+ free sources without expensive subscriptions
 - **Alternative Data Intelligence**: Capture market sentiment, social trends, and developer activity before they impact prices
 - **Zero-Config Quick Start**: Core features work immediately with DeFiLlama and CoinGecko (no API keys required)
@@ -37,6 +39,8 @@ The Antigravity Microanalyst Team is a specialized swarm of AI agents designed t
 - **Scenario Planner Agent**: Generates what-if market scenarios with probability assessments and identifies key catalysts and invalidation levels.
 - **Anomaly Detection Agent**: Identifies unusual market behavior, volume spikes, whale movements, and microstructure anomalies for trading opportunities.
 - **Validator Agent**: Cross-checks analysis outputs for consistency, validates Logic Matrix application, and ensures report quality.
+- **Black Swan Detector Agent**: Monitors market conditions for extreme events including price movements >10%, volume spikes >5x average, volatility explosions, and market structure breakdowns. Generates emergency response recommendations with severity-based position adjustments.
+- **Correlation & Market Regime Analyzer Agent**: Analyzes rolling correlations between BTC and major assets (ETH, SPX, DXY, Gold), detects market regime changes, identifies correlation breakdowns, and assesses cross-asset contagion risks for strategy adjustment.
 
 ## Architecture
 
@@ -232,6 +236,16 @@ python -m agents.anomaly_detection_agent BTC-USD
 **Quality Validation** (consistency checks and logic validation):
 ```bash
 python -m agents.validator_agent BTC-USD
+```
+
+**Black Swan Detection** (extreme event monitoring and emergency responses):
+```bash
+python -m agents.black_swan_detector_agent BTC-USD 24
+```
+
+**Correlation & Market Regime Analysis** (cross-asset correlations and regime detection):
+```bash
+python -m agents.correlation_market_regime_agent BTC-USD 90
 ```
 
 ### Quick Examples
