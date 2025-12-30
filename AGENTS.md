@@ -1,550 +1,56 @@
-# Agent Architecture Documentation
-
-## Overview
-
-The Antigravity Microanalyst Team is a multi-agent system built with **PydanticAI** and **OpenRouter** for cryptocurrency market analysis. The architecture employs specialized AI agents that collaborate to gather data, perform analysis, and generate trading directives.
-
-This document provides a comprehensive guide to the agent architecture, implementation patterns, and data flow throughout the system.
-
-## Table of Contents
-
-1. [System Architecture](#system-architecture)
-2. [Core Agents](#core-agents)
-3. [Agent Factory & Configuration](#agent-factory--configuration)
-4. [Dependency Injection System](#dependency-injection-system)
-5. [Data Models](#data-models)
-6. [Multi-Source Orchestration](#multi-source-orchestration)
-7. [Agent Pipeline Flow](#agent-pipeline-flow)
-8. [Tools & Capabilities](#tools--capabilities)
-9. [Production Features](#production-features)
-10. [Extension Guide](#extension-guide)
-
----
-
-## System Architecture
-
-### High-Level Design
-
-The system follows a modular, pipeline-based architecture where specialized agents perform distinct roles:
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                     DATA COLLECTION PHASE                        │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                   │
-│  ┌──────────────┐    ┌──────────────┐    ┌──────────────┐      │
-│  │ Quant Agent  │    │ Scout Agent  │    │  Blockchain  │      │
-│  │              │    │              │    │    Agent     │      │
-│  │ Technical    │    │ Fundamental  │    │              │      │
-│  │ Analysis     │    │ & Macro      │    │  On-Chain    │      │
-│  │              │    │              │    │  Analysis    │      │
-│  └──────┬───────┘    └──────┬───────┘    └──────┬───────┘      │
-│         │                   │                   │               │
-│         └───────────────────┴───────────────────┘               │
-│                            │                                    │
-└────────────────────────────┼────────────────────────────────────┘
-                             │
-┌────────────────────────────┼────────────────────────────────────┐
-│                     AGGREGATION PHASE                            │
-├────────────────────────────┼────────────────────────────────────┤
-│                            │                                    │
-│                  ┌─────────▼──────────┐                         │
-│                  │  Coordinator Agent │                         │
-│                  │                    │                         │
-│                  │  Data Aggregation  │                         │
-│                  │  Master State Gen  │                         │
-│                  └─────────┬──────────┘                         │
-│                            │                                    │
-└────────────────────────────┼────────────────────────────────────┘
-                             │
-┌────────────────────────────┼────────────────────────────────────┐
-│                     ANALYSIS PHASE                               │
-├────────────────────────────┼────────────────────────────────────┤
-│                            │                                    │
-│                  ┌─────────▼──────────┐                         │
-│                  │ Lead Analyst Agent │                         │
-│                  │                    │                         │
-│                  │  Logic Matrix      │                         │
-│                  │  Strategy Synth    │                         │
-│                  └─────────┬──────────┘                         │
-│                            │                                    │
-└────────────────────────────┼────────────────────────────────────┘
-                             │
-┌────────────────────────────┼────────────────────────────────────┐
-│                     OUTPUT PHASE                                 │
-├────────────────────────────┼────────────────────────────────────┤
-│                            │                                    │
-│                  ┌─────────▼──────────┐                         │
-│                  │   Editor Agent     │                         │
-│                  │                    │                         │
-│                  │  Report Generation │                         │
-│                  │  Human-Readable    │                         │
-│                  └─────────┬──────────┘                         │
-│                            │                                    │
-└────────────────────────────┼────────────────────────────────────┘
-                             │
-┌────────────────────────────┼────────────────────────────────────┐
-│              COMPLEMENTARY ANALYSIS PHASE (OPTIONAL)             │
-├────────────────────────────┼────────────────────────────────────┤
-│                            │                                    │
-│  ┌─────────────┐  ┌───────▼─────────┐  ┌──────────────┐       │
-│  │   Risk      │  │   Scenario      │  │   Anomaly    │       │
-│  │  Manager    │  │   Planner       │  │  Detection   │       │
-│  │             │  │                 │  │              │       │
-│  │ Position    │  │ What-If         │  │ Pattern      │       │
-│  │ Sizing &    │  │ Scenarios &     │  │ Detection &  │       │
-│  │ Stop-Loss   │  │ Probabilities   │  │ Alerts       │       │
-│  └─────────────┘  └─────────────────┘  └──────────────┘       │
-│                                                                   │
-│  ┌─────────────┐  ┌─────────────────┐                          │
-│  │ Correlation │  │   Validator     │                          │
-│  │   & Regime  │  │                 │                          │
-│  │  Analyzer   │  │  QA & Logic     │                          │
-│  │             │  │  Consistency    │                          │
-│  │ Cross-Asset │  │                 │                          │
-│  │ Correlations│  │                 │                          │
-│  └─────────────┘  └─────────────────┘                          │
-│                                                                   │
-└───────────────────────────────────────────────────────────────────┘
-```
-
-### Architecture Principles
-
-1. **Separation of Concerns**: Each agent has a single, well-defined responsibility
-2. **Type Safety**: Pydantic models ensure data integrity throughout the pipeline
-3. **Dependency Injection**: Clean dependency management via `CryptoDependencies`
-4. **Resilience**: Exponential backoff, retries, and fallback chains for production reliability
-5. **Observability**: Structured outputs persisted as JSON artifacts for auditing
-
----
-
-## Core Agents
-
-### 1. Quant Agent (`agents/quant_agent.py`)
-
-**Purpose**: Performs technical analysis on cryptocurrency price data.
-
-**Model**: `openai/gpt-4o-mini` via OpenRouter
-
-**Input Dependencies**:
-- `CryptoDependencies` (symbol, http_client)
-
-**Output Type**: `TechnicalData`
-
-**Tools**:
-- `fetch_market_data()`: Fetches OHLCV data from yfinance, calculates EMA-200, RSI-14, volume metrics, and price volatility
-
-**Responsibilities**:
-- Calculate technical indicators (EMA, RSI)
-- Identify market regime (Trending_Up, Trending_Down, Consolidation)
-- Assess market microstructure (funding rate bias, OI trends, squeeze risk)
-- Generate risk profiles (support/resistance zones, invalidation stops)
-
-**Output Artifact**: `data/technical_data.json`
-
-**Example Usage**:
-```bash
-python -m agents.quant_agent BTC-USD
-```
-
----
-
-### 2. Scout Agent (`agents/scout_agent.py`)
-
-**Purpose**: Gathers fundamental, macro-economic, and alternative data sources.
-
-**Model**: `openai/gpt-4o-mini` via OpenRouter
-
-**Input Dependencies**:
-- `CryptoDependencies`
-- Multi-source orchestrator for blockchain data
-- Alternative data adapters
-
-**Output Type**: `FundamentalData`
-
-**Tools**:
-- `fetch_macro_data()`: Retrieves S&P 500 and DXY (US Dollar Index) levels
-- `fetch_defi_tvl_data()`: Gets Total Value Locked for DeFi protocols (DeFiLlama)
-- `fetch_crypto_market_data()`: Fetches token prices and market data (CoinGecko)
-- `fetch_news_sentiment()`: Analyzes news sentiment from CryptoPanic
-- `fetch_social_media_sentiment()`: Monitors Reddit (r/cryptocurrency, r/bitcoin)
-- `fetch_google_trends()`: Tracks search interest correlation
-- `fetch_github_activity()`: Measures development activity
-- `fetch_options_market_data()`: Retrieves Deribit options flow (P/C ratios, IV)
-
-**Responsibilities**:
-- Monitor macro regime (Risk_On vs Risk_Off)
-- Track on-chain metrics (exchange flows, active addresses, whale activity)
-- Analyze sentiment signals (Fear & Greed Index, social volume)
-- Integrate alternative data for early signal detection
-
-**Output Artifact**: `data/fundamental_data.json`
-
-**Data Sources**:
-- **Free Tier**: DeFiLlama (unlimited), CoinGecko (50 calls/min)
-- **Optional API Keys**: Dune Analytics (1000/day), Etherscan (100K/day), CryptoPanic, GitHub, Deribit
-
-**Example Usage**:
-```bash
-python -m agents.scout_agent BTC
-```
-
----
-
-### 3. Blockchain Agent (`agents/blockchain_agent.py`)
-
-**Purpose**: Specialized on-chain analysis using multi-source orchestration.
-
-**Model**: `openai/gpt-4o-mini` via OpenRouter
-
-**Input Dependencies**:
-- `CryptoDependencies`
-- `MultiSourceOrchestrator`
-
-**Output Type**: `BlockchainAnalysisResult`
-
-**Tools**:
-- `get_defi_protocol_metrics()`: Fetch protocol TVL and chain breakdown
-- `get_token_market_data()`: Real-time prices, volume, market cap
-- `get_whale_wallet_activity()`: Track large holder movements
-- `query_blockchain_data()`: Complex on-chain queries via Dune Analytics
-
-**Responsibilities**:
-- Analyze DeFi protocol health via TVL trends
-- Monitor whale accumulation patterns
-- Track exchange inflows/outflows
-- Assess network activity and adoption metrics
-
-**Key Features**:
-- **Multi-source fallback**: Automatically switches between DeFiLlama → CoinGecko → Dune → Etherscan
-- **Intelligent caching**: File-based three-tier cache (hot/warm/cold) reduces API calls
-- **Query complexity routing**: Routes simple queries to fast sources, complex queries to Dune
-
-**Output Artifact**: `data/blockchain_analysis.json`
-
-**Example Usage**:
-```bash
-python -m agents.blockchain_agent
-```
-
----
-
-### 4. Coordinator Agent (`agents/coordinator_agent.py`)
-
-**Purpose**: Aggregates data from Quant and Scout agents into a unified Master State.
-
-**Model**: `openai/gpt-4o-mini` via OpenRouter
-
-**Input Dependencies**:
-- `CryptoDependencies`
-
-**Output Type**: `MasterState`
-
-**Tools**:
-- `load_technical_data()`: Reads `technical_data.json`
-- `load_fundamental_data()`: Reads `fundamental_data.json`
-
-**Responsibilities**:
-- Merge technical and fundamental data
-- Validate data completeness
-- Generate unified timestamp
-- Prepare data for Lead Analyst consumption
-
-**Output Artifact**: `data/master_state.json`
-
-**Data Model**:
-```python
-class MasterState(BaseModel):
-    technical: TechnicalData
-    fundamental: FundamentalData
-    status: str
-    aggregation_timestamp: datetime
-```
-
----
-
-### 5. Lead Analyst Agent (`agents/analyst_agent.py`)
-
-**Purpose**: Synthesizes Master State into trading directives using a strict Logic Matrix.
-
-**Model**: `openai/gpt-4o` via OpenRouter (uses more capable model for complex reasoning)
-
-**Input Dependencies**:
-- `CryptoDependencies`
-
-**Output Type**: `FinalDirective`
-
-**Tools**:
-- `get_master_state()`: Loads aggregated market data
-
-**Logic Matrix** (Hardcoded Boolean Rules):
-
-1. **Macro Veto**:
-   - IF `macro_regime == 'Risk_Off'` AND `technical.regime == 'Trending_Up'`
-   - THEN `directive = 'Neutral'` (Macro overrides Technicals)
-
-2. **Structure Priority**:
-   - IF `technical.regime == 'Trending_Up'` AND `sentiment_signal == 'Sell'`
-   - THEN IGNORE sentiment (Trend > Contrarian Signal)
-
-3. **Liquidity Filter**:
-   - IF `squeeze_risk == 'High'` OR `funding_rate_bias == 'Extreme'`
-   - THEN reduce exposure (mentioned in thesis_summary)
-
-**Responsibilities**:
-- Apply Logic Matrix to Master State
-- Generate stance (Aggressive_Long | Defensive_Long | Neutral | Tactical_Short)
-- Set leverage cap (1x | 3x | 5x)
-- Assign conviction score (0-100)
-- Provide detailed thesis summary
-
-**Output Artifact**: `data/FINAL_DIRECTIVE_YYYYMMDD.json`
-
-**Output Validation**:
-- Ensures thesis summary is at least 50 characters
-- Uses `@analyst_agent.output_validator` decorator
-- Raises `ModelRetry` if output is insufficient
-
-**Production Resilience**:
-- Exponential backoff with `tenacity`
-- Custom `RateLimitError` handling for 429 responses
-- 3 retry attempts with 2s → 4s → 8s backoff
-
----
-
-### 6. Editor Agent (`agents/editor_agent.py`)
-
-**Purpose**: Transforms technical directives into polished executive summaries.
-
-**Model**: `openai/gpt-4o-mini` via OpenRouter
-
-**Input Dependencies**:
-- `CryptoDependencies`
-
-**Output Type**: `str` (Markdown-formatted report)
-
-**Tools**:
-- `get_final_directive()`: Loads directive from Lead Analyst
-
-**Responsibilities**:
-- Convert JSON directive to human-readable prose
-- Structure report with executive summary, market assessment, strategy recommendation
-- Maintain professional tone suitable for stakeholders
-- Highlight key risk factors and confidence levels
-
-**Output Artifact**: `reports/EXECUTIVE_SUMMARY_YYYYMMDD.md`
-
-**Report Structure**:
-```markdown
-# Executive Summary - [Date]
-
-## Market Assessment
-[High-level market conditions]
-
-## Strategy Recommendation
-[Actionable directive with rationale]
-
-## Risk Considerations
-[Key risk factors and invalidation levels]
-
-## Confidence Level
-[Overall confidence with caveats]
-```
-
-**Example Usage**:
-```bash
-python -m agents.editor_agent
-```
-
----
-
-### 7. Risk Manager Agent (`agents/risk_manager_agent.py`)
-
-**Purpose**: Dedicated risk assessment and position sizing recommendations.
-
-**Model**: `openai/gpt-4o-mini` via OpenRouter
-
-**Input Dependencies**:
-- `CryptoDependencies`
-
-**Output Type**: `RiskAssessment`
-
-**Tools**:
-- `load_master_state()`: Loads aggregated market data for risk analysis
-- `load_final_directive()`: Retrieves current directive and stance
-- `calculate_position_metrics()`: Calculates position sizing based on volatility and risk tolerance
-
-**Responsibilities**:
-- Calculate appropriate position sizes based on portfolio risk tolerance
-- Monitor correlation risks across crypto assets
-- Assess tail risk scenarios (black swan events)
-- Generate stop-loss and take-profit recommendations
-- Estimate maximum drawdown based on volatility
-- Provide risk-adjusted leverage recommendations
-
-**Output Artifact**: `data/risk_assessment.json`
-
-**Output Model**:
-```python
-class RiskAssessment(BaseModel):
-    position_size_btc: float
-    portfolio_risk_percentage: float
-    stop_loss_price: float
-    take_profit_targets: List[float]
-    max_drawdown_estimate: float
-    tail_risk_score: int  # 0-100
-    correlation_warning: Optional[str]
-```
-
-**Example Usage**:
-```bash
-python -m agents.risk_manager_agent BTC-USD 10000 2.0
-```
-
----
-
-### 8. Scenario Planner Agent (`agents/scenario_planner_agent.py`)
-
-**Purpose**: Generate what-if market scenarios with probability assessments.
-
-**Model**: `openai/gpt-4o` via OpenRouter (uses more capable model for complex scenario analysis)
-
-**Input Dependencies**:
-- `CryptoDependencies`
-
-**Output Type**: `ScenarioAnalysis`
-
-**Tools**:
-- `load_master_state()`: Loads market data for scenario modeling
-- `load_final_directive()`: Retrieves current analytical stance
-- `calculate_price_targets()`: Calculates scenario-based price targets using technical levels
-
-**Responsibilities**:
-- Model bull/bear/base case market scenarios
-- Assess impact of macro events (Fed decisions, regulatory changes)
-- Generate probability-weighted outcomes
-- Identify key price levels and catalysts
-- Define invalidation levels for each scenario
-- Provide timeframe estimates for scenario realization
-
-**Output Artifact**: `data/scenario_analysis.json`
-
-**Output Model**:
-```python
-class ScenarioAnalysis(BaseModel):
-    scenarios: List[MarketScenario]
-    most_likely_scenario: str
-    probability_distribution: Dict[str, float]
-    key_catalysts: List[str]
-    invalidation_levels: Dict[str, float]
-```
-
-**Example Usage**:
-```bash
-python -m agents.scenario_planner_agent BTC-USD "1 week"
-```
-
----
-
-### 9. Anomaly Detection Agent (`agents/anomaly_detection_agent.py`)
-
-**Purpose**: Identify unusual market behavior and potential trading opportunities.
-
-**Model**: `openai/gpt-4o-mini` via OpenRouter
-
-**Input Dependencies**:
-- `CryptoDependencies`
-
-**Output Type**: `AnomalyReport`
-
-**Tools**:
-- `load_technical_data()`: Loads technical indicators for anomaly detection
-- `load_fundamental_data()`: Loads on-chain and sentiment data
-- `detect_statistical_anomalies()`: Performs z-score based anomaly detection
-
-**Responsibilities**:
-- Detect volume spikes and unusual price movements
-- Identify extreme technical indicator readings
-- Flag unusual on-chain activity (whale movements, exchange flows)
-- Monitor sentiment extremes (Fear & Greed Index)
-- Detect microstructure anomalies (funding rate extremes, OI spikes)
-- Flag macro regime shifts or correlation breakdowns
-- Provide actionable recommendations based on anomalies
-
-**Output Artifact**: `data/anomaly_report.json`
-
-**Output Model**:
-```python
-class AnomalyReport(BaseModel):
-    anomalies_detected: List[Anomaly]
-    severity_scores: Dict[str, int]
-    recommended_actions: List[str]
-    monitoring_alerts: List[str]
-```
-
-**Example Usage**:
-```bash
-python -m agents.anomaly_detection_agent BTC-USD
-```
-
----
-
-### 10. Validator Agent (`agents/validator_agent.py`)
-
-**Purpose**: Cross-check analysis outputs for consistency and quality.
-
-**Model**: `openai/gpt-4o` via OpenRouter (uses more capable model for complex validation logic)
-
-**Input Dependencies**:
-- `CryptoDependencies`
-
-**Output Type**: `ValidationReport`
-
-**Tools**:
-- `load_technical_data()`: Loads technical data for validation
-- `load_fundamental_data()`: Loads fundamental data for validation
-- `load_master_state()`: Loads aggregated state for cross-checking
-- `load_final_directive()`: Loads directive for logic validation
-- `validate_data_integrity()`: Validates field consistency across outputs
-
-**Responsibilities**:
-- Validate that Quant + Scout data matches Coordinator output
-- Check for logical inconsistencies in Analyst directives
-- Flag contradictions between stance and market conditions
-- Verify that conviction scores align with evidence strength
-- Detect unsupported claims in thesis summaries
-- Assess overall data quality and consistency
-- Generate quality scores for consistency, data, and logic
-
-**Output Artifact**: `data/validation_report.json`
-
-**Output Model**:
-```python
-class ValidationReport(BaseModel):
-    validation_passed: bool
-    issues_found: List[ValidationIssue]
-    consistency_score: int  # 0-100
-    data_quality_score: int  # 0-100
-    logic_quality_score: int  # 0-100
-    summary: str
-```
-
-**Example Usage**:
-```bash
-python -m agents.validator_agent BTC-USD
-```
-
----
-
-### 11. Correlation & Market Regime Analyzer (`agents/correlation_market_regime_agent.py`)
-
-**Purpose**: Analyze rolling correlations and detect market regime changes.
-
-**Model**: `openai/gpt-4o-mini` via OpenRouter
-
-**Input Dependencies**:
-- `CryptoDependencies`
-
+# Antigravity Microanalyst Team - Project Memory
+
+## Project Overview
+A multi-agent autonomous system for cryptocurrency market analysis built with **PydanticAI** and **OpenRouter**. The system employs a swarm of specialized agents (Quant, Scout, Blockchain, Analyst) to gather data, synthesize strategies via a Logic Matrix, and generate executive summaries.
+
+## Core Architecture
+- **Framework**: PydanticAI (Agents, Tools, RunContext) + OpenRouter (LLMs).
+- **Pattern**: Sequential Pipeline (Collection → Aggregation → Analysis → Output).
+- **State Management**: JSON artifacts in `data/` (e.g., `master_state.json`).
+- **Dependency Injection**: `CryptoDependencies` (shared `httpx.AsyncClient`).
+- **Orchestration**: `MultiSourceOrchestrator` for blockchain data routing/fallback.
+
+## Key Commands
+
+### Setup & Testing
+- **Install Dependencies**: `pip install -r requirements.txt`
+- **Run Tests**: `pytest` (Configured in `pytest.ini`, covers agents/tools/models)
+- **Check Coverage**: `pytest --cov=agents --cov=tools`
+
+### Agent Execution (Primary Workflows)
+- **Run Full Pipeline**: `python -m agents.editor_agent` (Triggers entire flow)
+- **Technical Analysis**: `python -m agents.quant_agent BTC-USD`
+- **Fundamental/Macro**: `python -m agents.scout_agent BTC`
+- **On-Chain Analysis**: `python -m agents.blockchain_agent`
+- **Risk Assessment**: `python -m agents.risk_manager_agent BTC-USD 10000 2.0`
+- **Scenario Planning**: `python -m agents.scenario_planner_agent BTC-USD "1 week"`
+- **Anomaly Detection**: `python -m agents.anomaly_detection_agent BTC-USD`
+
+### Tool Testing
+- **Test On-Chain Adapters**: `python -m tools.blockchain_adapters`
+- **Test Alternative Data**: `python -m tools.alternative_data_adapters`
+
+## Codebase Map & Pointers
+- **Agent Definitions**: `agents/*.py` (See `AGENTS.md` for detailed roles).
+- **Data Models**: `models/models.py` (Pydantic v2 schemas for all I/O).
+- **Configuration**: `config/agent_factory.py` (Model settings, retry logic).
+- **Dependencies**: `deps/dependencies.py` (DI container).
+- **Orchestration**: `tools/blockchain_orchestrator.py` (Routing logic).
+
+## Coding Standards & Conventions
+1. **Type Safety**: Use **Pydantic models** for all agent inputs/outputs. Validation is strict.
+2. **Dependency Injection**: Never use global state. Inject `CryptoDependencies` into tools via `ctx: RunContext[CryptoDependencies]`.
+3. **Async/Await**: All I/O tools must be `async`. Use `await` for HTTP calls.
+4. **Error Handling**:
+   - Use `ModelRetry` for transient errors (rate limits).
+   - Return error dicts for permanent failures.
+5. **Documentation**: Google-style docstrings are required for all tools (LLMs read these).
+6. **Logging**: Use `structlog` patterns for observability.
+
+## Important Context
+- **API Keys**: Requires `OPENROUTER_API_KEY` in `.env`. Optional keys for Dune/Etherscan.
+- **Model Selection**: `gpt-4o-mini` for data/tasks, `gpt-4o` for complex reasoning (Analyst/Validator).
+- **Artifacts**: Agents communicate via files in `data/`. Do not assume in-memory state sharing between separate process runs.
 **Output Type**: `CorrelationMarketRegimeAnalysis`
 
 **Tools**:
@@ -1464,3 +970,4 @@ This architecture provides a solid foundation for building sophisticated trading
 **Document Version**: 1.0.0
 **Last Updated**: 2025-12-29
 **Codebase Version**: v0.4.0
+
